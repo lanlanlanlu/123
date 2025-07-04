@@ -1,61 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
-import 'package:record/features/home/presentation/bloc/location_list_bloc.dart';
-import 'package:record/features/home/presentation/pages/location_notes_page.dart';
+import 'package:record/data/database/database.dart';
+import 'package:record/data/repository/index.dart';
+import 'package:record/features/tags/presentation/bloc/tag_list_bloc.dart';
+import 'package:record/features/tags/presentation/pages/tag_detail_page.dart';
 
-/// 位置信息列表页面
-class LocationListPage extends StatelessWidget {
-  const LocationListPage({super.key});
+class TagCategoriesPage extends StatelessWidget {
+  const TagCategoriesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => LocationListBloc()..add(LocationListLoaded()),
-      child: const LocationListView(),
+      create: (context) {
+        final tagsRepository = context.read<TagsRepository>();
+        return TagListBloc(tagsRepository: tagsRepository)
+          ..add(const TagListLoadTags());
+      },
+      child: const TagCategoriesView(),
     );
   }
 }
 
-class LocationListView extends StatefulWidget {
-  const LocationListView({super.key});
+class TagCategoriesView extends StatefulWidget {
+  const TagCategoriesView({super.key});
 
   @override
-  State<LocationListView> createState() => _LocationListViewState();
+  State<TagCategoriesView> createState() => _TagCategoriesViewState();
 }
 
-class _LocationListViewState extends State<LocationListView> {
-  // 用于跟踪是否有位置被删除
-  bool _hasLocationDeleted = false;
+class _TagCategoriesViewState extends State<TagCategoriesView> {
+  // 用于跟踪是否有标签被删除
+  bool _hasTagDeleted = false;
   
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('位置信息'),
+        title: const Text('所有标签'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(_hasLocationDeleted), // 返回时传递是否有位置被删除
+          onPressed: () => Navigator.of(context).pop(_hasTagDeleted), // 返回时传递是否有标签被删除
         ),
       ),
-      body: BlocConsumer<LocationListBloc, LocationListState>(
+      body: BlocConsumer<TagListBloc, TagListState>(
         listener: (context, state) {
-          // 当位置列表加载成功，并且是由于删除位置触发的，设置标志位
-          if (state is LocationListLoadedState && state.isAfterDeletion) {
+          if (state is TagListLoaded && state.isAfterDeletion) {
             setState(() {
-              _hasLocationDeleted = true; // 标记有位置被删除
+              _hasTagDeleted = true; // 标记有标签被删除
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('位置已删除')),
+              const SnackBar(content: Text('标签已删除')),
+            );
+          } else if (state is TagOperationSuccess) {
+            setState(() {
+              _hasTagDeleted = true; // 标记有标签被删除
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          } else if (state is TagListError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
+              ),
             );
           }
         },
         builder: (context, state) {
-          if (state is LocationListLoading) {
+          if (state is TagListLoading) {
             return const Center(child: CircularProgressIndicator());
-          } else if (state is LocationListLoadedState) {
-            return _buildLocationList(context, state.locations);
-          } else if (state is LocationListError) {
+          }
+          
+          if (state is TagListLoaded) {
+            return _buildTagList(context, state.tags, state.tagYears);
+          }
+          
+          if (state is TagListError) {
             return Center(child: Text('加载失败: ${state.message}'));
           }
           
@@ -65,22 +86,56 @@ class _LocationListViewState extends State<LocationListView> {
     );
   }
   
-  Widget _buildLocationList(BuildContext context, List<String> locations) {
-    if (locations.isEmpty) {
-      return const Center(child: Text('没有位置信息'));
+  Widget _buildTagList(BuildContext context, List<Tag> tags, Set<String> years) {
+    if (tags.isEmpty && years.isEmpty) {
+      return const Center(child: Text('没有标签'));
     }
     
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
-      child: Wrap(
-        spacing: 12.0,
-        runSpacing: 12.0,
-        children: locations.map((location) => _buildLocationChip(context, location)).toList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 年份标签部分
+          if (years.isNotEmpty) ...[
+            const Text(
+              '按年份浏览',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12.0,
+              runSpacing: 12.0,
+              children: years.map((year) => _buildYearChip(context, year)).toList(),
+            ),
+            const SizedBox(height: 24),
+          ],
+          
+          // 普通标签部分
+          if (tags.isNotEmpty) ...[
+            const Text(
+              '所有标签',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12.0,
+              runSpacing: 12.0,
+              children: tags.map((tag) => _buildTagChip(context, tag)).toList(),
+            ),
+          ],
+        ],
       ),
     );
   }
   
-  Widget _buildLocationChip(BuildContext context, String location) {
+  Widget _buildTagChip(BuildContext context, Tag tag) {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.light
@@ -89,12 +144,21 @@ class _LocationListViewState extends State<LocationListView> {
         borderRadius: BorderRadius.circular(32),
       ),
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
+        onTap: () async {
+          // 导航到标签详情页，并等待返回结果
+          final result = await Navigator.push<bool>(
+            context,
             MaterialPageRoute(
-              builder: (_) => LocationNotesPage(location: location),
+              builder: (context) => TagDetailPage(tagName: tag.name),
             ),
           );
+          
+          // 如果返回结果为true，表示有笔记被删除，需要刷新标签列表
+          if (result == true) {
+            setState(() {
+              _hasTagDeleted = true; // 标记有标签被删除
+            });
+          }
         },
         borderRadius: BorderRadius.circular(32),
         child: Padding(
@@ -107,14 +171,14 @@ class _LocationListViewState extends State<LocationListView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
-                  Icons.location_on_outlined,
+                  Icons.tag,
                   size: 18,
-                  color: Colors.deepPurple,
+                  color: Colors.blue,
                 ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    location,
+                    tag.name,
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
@@ -127,7 +191,7 @@ class _LocationListViewState extends State<LocationListView> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => _showDeleteConfirmationDialog(context, location),
+                      onTap: () => _showDeleteConfirmationDialog(context, tag.name),
                       borderRadius: BorderRadius.circular(4),
                       child: Padding(
                         padding: const EdgeInsets.all(2.0),
@@ -148,9 +212,50 @@ class _LocationListViewState extends State<LocationListView> {
     );
   }
   
-  Future<void> _showDeleteConfirmationDialog(BuildContext context, String location) async {
+  Widget _buildYearChip(BuildContext context, String year) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.light
+            ? const Color(0xFFE3F2FD) // 浅蓝色背景
+            : Colors.blueGrey[800],
+        borderRadius: BorderRadius.circular(32),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TagDetailPage(tagName: year, isYearTag: true),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(32),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.calendar_today,
+                size: 18,
+                color: Colors.indigo,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$year年',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Future<void> _showDeleteConfirmationDialog(BuildContext context, String tagName) async {
     // 在显示对话框前先获取bloc
-    final locationListBloc = context.read<LocationListBloc>();
+    final tagListBloc = context.read<TagListBloc>();
     
     return showDialog<void>(
       context: context,
@@ -175,7 +280,7 @@ class _LocationListViewState extends State<LocationListView> {
                 ),
                 const SizedBox(height: 20.0),
                 Text(
-                  '确定要删除 $location 位置信息?',
+                  '确定要删除 #$tagName 标签?',
                   style: const TextStyle(fontSize: 16.0),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -209,7 +314,7 @@ class _LocationListViewState extends State<LocationListView> {
                       child: TextButton(
                         onPressed: () {
                           // 使用预先获取的bloc而不是从对话框context中读取
-                          locationListBloc.add(LocationDeleted(location));
+                          tagListBloc.add(TagDeleted(tagName));
                           Navigator.of(dialogContext).pop();
                         },
                         style: TextButton.styleFrom(

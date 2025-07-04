@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:record/data/database/database.dart';
+import 'package:record/data/repository/index.dart';
 
 /// 显示笔记的字数统计和标签的组件
 class StatsAndTagsBar extends StatelessWidget {
@@ -9,12 +10,20 @@ class StatsAndTagsBar extends StatelessWidget {
 
   /// 编辑模式下使用，从当前内容中提取标签
   final String? content;
+  
+  /// 是否处于编辑模式
+  final bool isEditing;
+  
+  /// 标签删除回调
+  final Function(String)? onTagRemoved;
 
   /// 构造函数 - 需要提供noteId或content之一
   const StatsAndTagsBar({
     super.key,
     this.noteId,
     this.content,
+    this.isEditing = false,
+    this.onTagRemoved,
   }) : assert(noteId != null || content != null, "必须提供noteId或content之一");
 
   // 提取标签方法 - 确保在所有文本中搜索标签，不仅仅是标题或内容部分
@@ -51,9 +60,16 @@ class StatsAndTagsBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // 字数统计
-        Text(
-          '$wordCount 字',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            '$wordCount 字',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
         ),
         const SizedBox(width: 8),
         // 标签显示 - 从数据库中获取
@@ -66,25 +82,17 @@ class StatsAndTagsBar extends StatelessWidget {
               if (tags.isEmpty) return const SizedBox.shrink();
               
               return SizedBox(
-                height: 24,
+                height: 22,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: tags.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 4),
+                  separatorBuilder: (context, index) => const SizedBox(width: 6),
                   itemBuilder: (context, index) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '#${tags[index].name}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ),
+                    return _buildTagChip(
+                      context,
+                      tags[index].name,
+                      isActive: true,
+                      showDeleteButton: false,
                     );
                   },
                 ),
@@ -105,9 +113,16 @@ class StatsAndTagsBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // 字数统计
-        Text(
-          '$wordCount 字',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            '$wordCount 字',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
         ),
         const SizedBox(width: 8),
         // 标签显示 - 合并当前编辑内容中的标签和数据库中的标签
@@ -125,29 +140,20 @@ class StatsAndTagsBar extends StatelessWidget {
               if (allTags.isEmpty) return const SizedBox.shrink();
               
               return SizedBox(
-                height: 24,
+                height: 22,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: allTags.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 4),
+                  separatorBuilder: (context, index) => const SizedBox(width: 6),
                   itemBuilder: (context, index) {
                     final tagName = allTags[index];
                     final bool isInCurrentText = extractedTags.contains(tagName);
                     
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: isInCurrentText ? Colors.grey.shade200 : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: isInCurrentText ? null : Border.all(color: Colors.grey.shade300, width: 1),
-                      ),
-                      child: Text(
-                        '#$tagName',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isInCurrentText ? Theme.of(context).primaryColor : Colors.grey.shade600,
-                        ),
-                      ),
+                    return _buildTagChip(
+                      context,
+                      tagName,
+                      isActive: isInCurrentText,
+                      showDeleteButton: isEditing,
                     );
                   },
                 ),
@@ -168,40 +174,108 @@ class StatsAndTagsBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // 字数统计
-        Text(
-          '$wordCount 字',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            '$wordCount 字',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
         ),
         const SizedBox(width: 8),
         // 标签显示 - 针对编辑和预览模式，使用从当前内容中提取的标签
         if (extractedTags.isNotEmpty)
           Expanded(
             child: SizedBox(
-              height: 24,
+              height: 22,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: extractedTags.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 4),
+                separatorBuilder: (context, index) => const SizedBox(width: 6),
                 itemBuilder: (context, index) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '#${extractedTags[index]}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
+                  final tagName = extractedTags[index];
+                  return _buildTagChip(
+                    context,
+                    tagName,
+                    isActive: true,
+                    showDeleteButton: isEditing,
                   );
                 },
               ),
             ),
           ),
       ],
+    );
+  }
+  
+  // 构建统一的标签组件
+  Widget _buildTagChip(
+    BuildContext context,
+    String tagName, {
+    required bool isActive,
+    required bool showDeleteButton,
+  }) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.primaryColor;
+    final tagColor = isActive ? primaryColor.withOpacity(0.1) : Colors.grey.shade100;
+    final textColor = isActive ? primaryColor : Colors.grey.shade600;
+    
+    return Container(
+      height: 22,
+      padding: EdgeInsets.only(
+        left: 8,
+        right: showDeleteButton ? 4 : 8,
+      ),
+      decoration: BoxDecoration(
+        color: tagColor,
+        borderRadius: BorderRadius.circular(11),
+        border: isActive ? null : Border.all(color: Colors.grey.shade300, width: 0.5),
+        boxShadow: isActive ? [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.1),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ] : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '#$tagName',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
+              color: textColor,
+            ),
+          ),
+          if (showDeleteButton)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                if (onTagRemoved != null) {
+                  onTagRemoved!(tagName);
+                }
+              },
+              child: Container(
+                margin: const EdgeInsets.only(left: 2),
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.close,
+                  size: 10,
+                  color: textColor,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 } 

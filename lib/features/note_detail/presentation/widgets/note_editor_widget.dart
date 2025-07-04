@@ -27,6 +27,9 @@ class NoteEditorWidget extends StatelessWidget {
   /// 删除图片回调
   final Function(String)? onDeleteImage;
 
+  /// 删除标签回调 - 用于从数据库中删除标签
+  final Function(String)? onTagRemoved;
+
   const NoteEditorWidget({
     super.key,
     required this.titleController,
@@ -35,7 +38,48 @@ class NoteEditorWidget extends StatelessWidget {
     required this.noteId,
     required this.onTitleChanged,
     this.onDeleteImage,
+    this.onTagRemoved,
   });
+
+  // 处理删除标签
+  void _handleTagRemoved(String tagName, TextEditingController controller) {
+
+    final text = controller.text;
+    
+    // 使用更精确的正则表达式匹配标签
+    // 处理多种情况：行首、空格后、标点符号后等
+    String newText = text;
+    
+    // 1. 处理行首的标签
+    final startPattern = RegExp(r'^#' + RegExp.escape(tagName) + r'(?=\s|$)');
+    newText = newText.replaceAll(startPattern, '');
+    
+    // 2. 处理空格后的标签
+    final spacePattern = RegExp(r'(\s)#' + RegExp.escape(tagName) + r'(?=\s|$)');
+    newText = newText.replaceAll(spacePattern, r'$1');
+    
+    // 3. 处理特殊情况：标签在行中间或结尾
+    final anywherePattern = RegExp(r'#' + RegExp.escape(tagName) + r'\b');
+    if (newText.contains(anywherePattern)) {
+      newText = newText.replaceAll(anywherePattern, '');
+    }
+    
+    
+    // 更新文本控制器
+    controller.text = newText;
+    
+    // 保存光标位置
+    final cursorPosition = controller.selection.start;
+    controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: cursorPosition > newText.length ? newText.length : cursorPosition)
+    );
+    
+    // 调用父组件的回调函数，从数据库中删除标签
+    if (onTagRemoved != null) {
+      onTagRemoved!(tagName);
+    }
+    
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +110,8 @@ class NoteEditorWidget extends StatelessWidget {
           child: StatsAndTagsBar(
             noteId: noteId,
             content: textController.text,
+            isEditing: true,
+            onTagRemoved: (tagName) => _handleTagRemoved(tagName, textController),
           ),
         ),
         

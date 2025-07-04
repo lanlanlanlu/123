@@ -251,6 +251,66 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     // 实际的图片更新会在_saveNote方法中进行
   }
 
+  // 处理删除标签
+  void _handleTagRemoved(String tagName) async {
+
+    // 查找并删除标签
+    final text = _textController.text;
+    
+    // 使用更精确的正则表达式匹配标签
+    // 处理多种情况：行首、空格后、标点符号后等
+    String newText = text;
+    
+    // 1. 处理行首的标签
+    final startPattern = RegExp(r'^#' + RegExp.escape(tagName) + r'(?=\s|$)');
+    newText = newText.replaceAll(startPattern, '');
+    
+    // 2. 处理空格后的标签
+    final spacePattern = RegExp(r'(\s)#' + RegExp.escape(tagName) + r'(?=\s|$)');
+    newText = newText.replaceAll(spacePattern, r'$1');
+    
+    // 3. 处理特殊情况：标签在行中间或结尾
+    final anywherePattern = RegExp(r'#' + RegExp.escape(tagName) + r'\b');
+    if (newText.contains(anywherePattern)) {
+      newText = newText.replaceAll(anywherePattern, '');
+    }
+    
+    
+    // 更新文本控制器
+    setState(() {
+      _textController.text = newText;
+      _lastText = newText;
+    });
+    
+    // 通知BLoC内容已更新
+    context.read<NoteDetailBloc>().add(NoteDetailUpdateContent(newText));
+    
+    // 从数据库中查找并删除标签关联
+    
+      final state = context.read<NoteDetailBloc>().state;
+      if (state is NoteDetailLoaded) {
+        final noteId = state.note.id;
+        final tagsRepository = context.read<TagsRepository>();
+        
+        // 获取当前笔记的所有标签
+        final tags = await tagsRepository.getTagsForNote(noteId);
+        
+        // 查找匹配的标签
+        for (final tag in tags) {
+          if (tag.name == tagName) {
+            // 从数据库中删除标签关联
+            await tagsRepository.removeTagFromNote(noteId, tag.id);
+            
+            // 通知Bloc标签已删除
+            context.read<NoteDetailBloc>().add(NoteDetailRemoveTag(tag.id));
+            break;
+          }
+        }
+      }
+    
+    
+  }
+
   List<Widget> _buildAppBarActions(NoteDetailLoaded state) {
     if (state.editMode == NoteEditMode.editing || state.editMode == NoteEditMode.previewing) {
       if (state.editMode == NoteEditMode.previewing) {
@@ -401,12 +461,14 @@ class _NoteDetailViewState extends State<NoteDetailView> {
                                     noteId: note.id,
                                     onTitleChanged: _updateContentFromTitle,
                                     onDeleteImage: _handleDeleteImage,
+                                    onTagRemoved: _handleTagRemoved,
                                   )
                                 : NotePreviewWidget(
                                     content: _textController.text,
                                     title: _titleController.text,
                                     noteId: note.id,
                                     onDeleteImage: _handleDeleteImage,
+                                    onTagRemoved: _handleTagRemoved,
                                   )
                             else
                               NoteReadingWidget(

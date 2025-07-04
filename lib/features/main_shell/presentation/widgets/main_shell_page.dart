@@ -4,7 +4,6 @@ import 'package:record/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:record/features/home/presentation/pages/home_page.dart';
 import 'package:record/features/main_shell/presentation/bloc/main_shell_cubit.dart';
 import 'package:record/features/settings/presentation/pages/settings_page.dart';
-import 'package:record/features/tags/presentation/pages/tag_list_page.dart';
 import 'package:record/features/main_shell/presentation/widgets/bottom_nav_bar.dart';
 import 'package:record/features/main_shell/presentation/widgets/input_sheet_overlay.dart';
 
@@ -77,14 +76,35 @@ class _MainShellPageState extends State<MainShellPage> {
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
         setState(() {
-          _pages[2] = const Scaffold(
-            appBar: PreferredSize(
-              preferredSize: Size.fromHeight(56),
-              child: SizedBox(),
+          // 将标签页改为空白页，为将来的功能留出空间
+          _pages[2] = Scaffold(
+            appBar: AppBar(
+              title: const Text('即将推出'),
+              centerTitle: true,
             ),
-            body: TagListPage()
+            body: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.construction,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    '功能开发中...',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey,
+                    ),
+            ),
+                ],
+              ),
+            ),
           );
           _pagesLoaded[2] = true;
+          
           _pages[3] = const Scaffold(
             appBar: PreferredSize(
               preferredSize: Size.fromHeight(56),

@@ -66,7 +66,7 @@ class _CustomAppBarContent extends StatelessWidget {
                     _buildIconButton(
                       icon: Icons.tag,
                       size: iconSize,
-                      onPressed: () => context.read<AppBarBloc>().add(AppBarTagPressed()),
+                      onPressed: () => context.read<AppBarBloc>().add(AppBarTagPressed(context)),
                     ),
                     SizedBox(width: iconSpacing),
                     // 搜索图标

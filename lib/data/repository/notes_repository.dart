@@ -28,6 +28,23 @@ class NotesRepository {
     return _database.noteDao.watchNotesByTagName(tagName);
   }
 
+  /// 监听指定年份的所有笔记
+  Stream<List<Note>> watchNotesByYear(String year) {
+    // 使用自定义SQL查询获取指定年份的笔记
+    final startDate = DateTime(int.parse(year), 1, 1);
+    final endDate = DateTime(int.parse(year) + 1, 1, 1);
+    
+    return (_database.select(_database.notes)
+      ..where((note) => 
+          note.updatedAt.isBiggerOrEqualValue(startDate) & 
+          note.updatedAt.isSmallerThanValue(endDate) & 
+          note.isDeleted.equals(false))
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)
+      ])
+    ).watch();
+  }
+
   /// 监听指定位置的所有笔记
   Stream<List<Note>> watchNotesByLocation(String location) {
     return (_database.select(_database.notes)

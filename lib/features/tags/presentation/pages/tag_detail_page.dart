@@ -1,18 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/core/widgets/interactive_text.dart';
-import 'package:record/data/database/database.dart';
+import 'package:go_router/go_router.dart';
 import 'package:record/data/repository/index.dart';
+import 'package:record/features/home/presentation/widgets/empty_notes_view.dart';
+import 'package:record/features/home/presentation/widgets/note_card.dart';
 import 'package:record/features/tags/presentation/bloc/tag_detail_bloc.dart';
-import 'package:record/core/utils/date_extensions.dart';
 
 class TagDetailPage extends StatelessWidget {
   final String tagName;
+  final bool isYearTag;
 
-  const TagDetailPage({super.key, required this.tagName});
+  const TagDetailPage({
+    super.key, 
+    required this.tagName,
+    this.isYearTag = false,
+  });
+
+  // 判断是否是年份标签（如"2025"）
+  static bool isYearTagName(String tagName) {
+    return RegExp(r'^[0-9]{4}$').hasMatch(tagName);
+  }
 
   @override
   Widget build(BuildContext context) {
+    // 检查是否是年份标签
+    final bool isYear = isYearTag || isYearTagName(tagName);
+    
     return BlocProvider(
       create: (context) {
         // 优先使用直接注入的NotesRepository
@@ -20,25 +33,46 @@ class TagDetailPage extends StatelessWidget {
           context.read<NotesRepository>();
         
         return TagDetailBloc(notesRepository: notesRepository)
-          ..add(TagDetailLoadNotes(tagName));
+          ..add(isYear 
+              ? TagDetailLoadNotesByYear(tagName) 
+              : TagDetailLoadNotes(tagName));
       },
-      child: TagDetailView(tagName: tagName),
+      child: TagDetailView(tagName: tagName, isYearTag: isYear),
     );
   }
 }
 
 class TagDetailView extends StatelessWidget {
   final String tagName;
+  final bool isYearTag;
 
-  const TagDetailView({super.key, required this.tagName});
+  const TagDetailView({
+    super.key, 
+    required this.tagName,
+    this.isYearTag = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('#$tagName'),
+        title: Text(isYearTag ? tagName + '年' : '#$tagName'),
       ),
-      body: BlocBuilder<TagDetailBloc, TagDetailState>(
+      body: BlocConsumer<TagDetailBloc, TagDetailState>(
+        listener: (context, state) {
+          if (state is TagDetailOperationSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          } else if (state is TagDetailError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
         builder: (context, state) {
           if (state is TagDetailLoading) {
             return const Center(child: CircularProgressIndicator());
@@ -48,49 +82,42 @@ class TagDetailView extends StatelessWidget {
             final notes = state.notes;
 
             if (notes.isEmpty) {
-              return const Center(
-                child: Text('这个标签下没有笔记。'),
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.tag,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      isYearTag ? '$tagName年没有笔记' : '这个标签下没有笔记',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text('返回'),
+                    ),
+                  ],
+                ),
               );
             }
 
-            // 这里的笔记列表和主页的几乎一样
+            // 使用与主页相同的NoteCard组件显示笔记
             return ListView.builder(
               itemCount: notes.length,
-              itemBuilder: (context, index) {
-                final note = notes[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        InteractiveText(
-                          text: note.content,
-                          style: const TextStyle(fontSize: 16, color: Colors.black87),
-                          onTagTap: (tag) {
-                            // 在标签详情页，点击标签可以跳转到另一个标签详情页
-                            if (tag != tagName) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => TagDetailPage(tagName: tag)),
-                              );
-                            }
-                          },
+              itemBuilder: (context, index) => NoteCard(
+                note: notes[index],
+                onDelete: (noteId) => context.read<TagDetailBloc>().add(TagDetailNoteDeleted(noteId)),
+                onRestore: (noteId) => context.read<TagDetailBloc>().add(TagDetailNoteRestored(noteId)),
                         ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            note.createdAt.toYYMMDD(),
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
             );
           }
           

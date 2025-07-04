@@ -22,12 +22,16 @@ class NotePreviewWidget extends StatelessWidget {
   /// 删除图片回调
   final Function(String)? onDeleteImage;
 
+  /// 删除标签回调
+  final Function(String)? onTagRemoved;
+
   const NotePreviewWidget({
     super.key,
     required this.title,
     required this.content,
     required this.noteId,
     this.onDeleteImage,
+    this.onTagRemoved,
   });
 
   @override
@@ -53,6 +57,8 @@ class NotePreviewWidget extends StatelessWidget {
           child: StatsAndTagsBar(
             noteId: noteId,
             content: content,
+            isEditing: true,
+            onTagRemoved: onTagRemoved,
           ),
         ),
         

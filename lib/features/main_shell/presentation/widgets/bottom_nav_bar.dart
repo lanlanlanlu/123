@@ -45,7 +45,7 @@ class BottomNavBar extends StatelessWidget {
           const SizedBox(width: 48),
           IconButton(
             icon: Icon(
-              Icons.label_outline,
+              Icons.explore_outlined,
               color: selectedIndex == 2 
                   ? Theme.of(context).primaryColor 
                   : Colors.grey
