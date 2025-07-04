@@ -1,0 +1,4 @@
+drift:
+  wasm:
+    web_worker_path: /drift_worker.js
+    sqlite3_wasm_path: /sqlite3.wasm
