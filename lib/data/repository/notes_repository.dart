@@ -1,11 +1,12 @@
 import 'package:drift/drift.dart';
 import 'package:record/data/database/database.dart';
+import 'package:record/data/database/connection/connection.dart' as connection;
 
 /// 笔记数据仓库，封装所有与笔记相关的数据操作
 class NotesRepository {
   final AppDatabase _database;
 
-  NotesRepository(this._database);
+  NotesRepository([AppDatabase? database]) : _database = database ?? connection.connect();
 
   /// 监听所有笔记
   Stream<List<Note>> watchAllNotes() {
@@ -25,6 +26,54 @@ class NotesRepository {
   /// 监听指定标签名称的所有笔记
   Stream<List<Note>> watchNotesByTagName(String tagName) {
     return _database.noteDao.watchNotesByTagName(tagName);
+  }
+
+  /// 监听指定位置的所有笔记
+  Stream<List<Note>> watchNotesByLocation(String location) {
+    return (_database.select(_database.notes)
+      ..where((note) => 
+          note.locationInfo.equals(location) & 
+          note.isDeleted.equals(false))
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)
+      ])
+    ).watch();
+  }
+
+  /// 获取所有位置信息
+  Future<List<String>> getAllLocations() async {
+    final result = await (_database.selectOnly(_database.notes)
+      ..addColumns([_database.notes.locationInfo])
+      ..where(_database.notes.locationInfo.isNotNull() & 
+             _database.notes.isDeleted.equals(false))
+      ..groupBy([_database.notes.locationInfo])
+    ).get();
+    
+    return result
+      .map((row) => row.read(_database.notes.locationInfo)!)
+      .where((location) => location.isNotEmpty)
+      .toList();
+  }
+
+  /// 删除位置信息
+  Future<void> deleteLocation(String location) async {
+    final now = DateTime.now();
+    
+    // 将所有该位置的笔记的位置信息设为空
+    await (_database.update(_database.notes)
+      ..where((note) => note.locationInfo.equals(location))
+    ).write(NotesCompanion(
+      locationInfo: const Value(null),
+      updatedAt: Value(now), // 使用当前时间，触发UI更新
+    ));
+    
+    // 从位置表中删除该位置的所有记录
+    await (_database.delete(_database.noteLocations)
+      ..where((loc) => loc.location.equals(location))
+    ).go();
+    
+    // 执行数据库同步，确保更改立即生效
+    await _database.customStatement('PRAGMA wal_checkpoint(FULL)');
   }
 
   /// 监听特定笔记的位置信息
@@ -89,7 +138,7 @@ class NotesRepository {
 
     String? locationToSave;
     if (locations.isNotEmpty) {
-      locationToSave = locations.last;
+      locationToSave = locations.last; // 只保存最后一个位置
     } else if (existingNote != null) {
       locationToSave = existingNote.locationInfo;
     }
@@ -118,6 +167,9 @@ class NotesRepository {
           updatedAt: Value(now),
         );
         await (_database.update(_database.notes)..where((t) => t.id.equals(noteId))).write(companion);
+        
+        // 删除该笔记所有旧的位置记录
+        await (_database.delete(_database.noteLocations)..where((tbl) => tbl.noteId.equals(noteId))).go();
       } else {
         final companion = NotesCompanion(
           title: Value(title),
@@ -130,13 +182,13 @@ class NotesRepository {
       }
 
       if (locationToSave != null && locationToSave.isNotEmpty) {
+        // 添加新的位置记录（因为之前已清除所有旧记录）
         await _database.into(_database.noteLocations).insert(
           NoteLocationsCompanion.insert(
             noteId: noteId,
             location: locationToSave,
             createdAt: Value(now),
           ),
-          onConflict: DoNothing(target: [_database.noteLocations.location, _database.noteLocations.noteId]),
         );
       }
 

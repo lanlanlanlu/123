@@ -1,5 +1,10 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:record/features/home/presentation/bloc/home_bloc.dart';
+import 'package:record/features/home/presentation/bloc/home_event.dart';
+import 'package:record/features/home/presentation/pages/location_list_page.dart';
 
 // 事件
 abstract class AppBarEvent extends Equatable {
@@ -9,7 +14,15 @@ abstract class AppBarEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class AppBarLocationPressed extends AppBarEvent {}
+class AppBarLocationPressed extends AppBarEvent {
+  final BuildContext context;
+  
+  const AppBarLocationPressed(this.context);
+  
+  @override
+  List<Object?> get props => [context];
+}
+
 class AppBarTagPressed extends AppBarEvent {}
 class AppBarSearchPressed extends AppBarEvent {}
 class AppBarMenuPressed extends AppBarEvent {}
@@ -43,9 +56,47 @@ class AppBarBloc extends Bloc<AppBarEvent, AppBarState> {
     on<AppBarMenuPressed>(_onMenuPressed);
   }
   
-  void _onLocationPressed(AppBarLocationPressed event, Emitter<AppBarState> emit) {
-    // 处理位置按钮逻辑
-    // 暂时只是占位
+  void _onLocationPressed(AppBarLocationPressed event, Emitter<AppBarState> emit) async {
+    // 导航到位置列表页面，并等待返回结果
+    final result = await Navigator.of(event.context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => const LocationListPage(),
+      ),
+    );
+    
+    // 如果返回结果为true，表示位置已被删除，需要刷新主页
+    if (result == true) {
+      // 刷新主页
+      if (event.context.mounted) {
+        try {
+          // 先尝试使用context.read获取HomeBloc
+          try {
+            final bloc = event.context.read<HomeBloc>();
+            bloc.add(HomeLoadNotes());
+          } catch (e) {
+            debugPrint('无法通过context.read获取HomeBloc: $e');
+            
+            // 如果无法获取，则返回到主页并刷新
+            final navigatorState = Navigator.of(event.context);
+            navigatorState.popUntil((route) => route.isFirst);
+            
+            // 等待一帧，确保回到了主页
+            await Future.delayed(const Duration(milliseconds: 100));
+            
+            if (event.context.mounted) {
+              try {
+                final bloc = event.context.read<HomeBloc>();
+                bloc.add(HomeLoadNotes());
+              } catch (e) {
+                debugPrint('无法刷新主页: $e');
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('无法刷新主页: $e');
+        }
+      }
+    }
   }
   
   void _onTagPressed(AppBarTagPressed event, Emitter<AppBarState> emit) {

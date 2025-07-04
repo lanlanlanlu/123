@@ -13,6 +13,16 @@ class HomeLoadNotes extends HomeEvent {
   const HomeLoadNotes();
 }
 
+/// 加载特定位置的笔记事件
+class HomeLoadNotesByLocation extends HomeEvent {
+  final String location;
+
+  const HomeLoadNotesByLocation(this.location);
+
+  @override
+  List<Object?> get props => [location];
+}
+
 /// 删除笔记事件
 class HomeNoteDeleted extends HomeEvent {
   final int id;

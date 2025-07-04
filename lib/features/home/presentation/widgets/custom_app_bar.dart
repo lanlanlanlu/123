@@ -23,83 +23,64 @@ class _CustomAppBarContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 获取屏幕宽度，用于响应式布局
+    final screenWidth = MediaQuery.of(context).size.width;
+    // 根据屏幕宽度决定图标尺寸和间距
+    final iconSize = screenWidth < 600 ? 22.0 : 24.0;
+    final iconSpacing = screenWidth < 600 ? 12.0 : 20.0;
+    
     return BlocBuilder<AppBarBloc, AppBarState>(
       builder: (context, state) {
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          padding: EdgeInsets.symmetric(
+            horizontal: screenWidth < 600 ? 16.0 : 24.0, 
+            vertical: 8.0
+          ),
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
-            // 移除了底部细线
           ),
           child: SafeArea(
             child: Row(
               children: [
                 // 左侧标题 - 使用更细的字体
-                const Text(
+                Text(
                   '笔记',
                   style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w400, // 更细的字体
+                    fontSize: screenWidth < 600 ? 28 : 32,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
                 const Spacer(),
-                // 右侧图标组 - 放在一个Row中以增加视觉凝聚力
+                // 右侧图标组 - 使用响应式布局
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // 位置图标
-                    IconButton(
-                      icon: const Icon(
-                        Icons.location_on_outlined,
-                        size: 22, // 更小的图标
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        context.read<AppBarBloc>().add(AppBarLocationPressed());
-                      },
+                    _buildIconButton(
+                      icon: Icons.location_on_outlined,
+                      size: iconSize,
+                      onPressed: () => context.read<AppBarBloc>().add(AppBarLocationPressed(context)),
                     ),
-                    const SizedBox(width: 8), // 减少图标间距
-                    // 标签图标
-                    IconButton(
-                      icon: const Text(
-                        "#",
-                        style: TextStyle(
-                          fontSize: 22, // 更小的图标
-                          fontWeight: FontWeight.w500, // 适当调整粗细
-                        ),
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        context.read<AppBarBloc>().add(AppBarTagPressed());
-                      },
+                    SizedBox(width: iconSpacing),
+                    // 标签图标 - 使用与其他图标一致的处理方式
+                    _buildIconButton(
+                      icon: Icons.tag,
+                      size: iconSize,
+                      onPressed: () => context.read<AppBarBloc>().add(AppBarTagPressed()),
                     ),
-                    const SizedBox(width: 8), // 减少图标间距
+                    SizedBox(width: iconSpacing),
                     // 搜索图标
-                    IconButton(
-                      icon: const Icon(
-                        Icons.search,
-                        size: 22, // 更小的图标
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        context.read<AppBarBloc>().add(AppBarSearchPressed());
-                      },
+                    _buildIconButton(
+                      icon: Icons.search,
+                      size: iconSize,
+                      onPressed: () => context.read<AppBarBloc>().add(AppBarSearchPressed()),
                     ),
-                    const SizedBox(width: 8), // 减少图标间距
+                    SizedBox(width: iconSpacing),
                     // 菜单图标
-                    IconButton(
-                      icon: const Icon(
-                        Icons.menu,
-                        size: 22, // 更小的图标
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        context.read<AppBarBloc>().add(AppBarMenuPressed());
-                      },
+                    _buildIconButton(
+                      icon: Icons.menu,
+                      size: iconSize,
+                      onPressed: () => context.read<AppBarBloc>().add(AppBarMenuPressed()),
                     ),
                   ],
                 ),
@@ -108,6 +89,23 @@ class _CustomAppBarContent extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+  
+  // 辅助方法：构建图标按钮，所有按钮使用相同的构建方法
+  Widget _buildIconButton({
+    required IconData icon,
+    required double size,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      icon: Icon(
+        icon,
+        size: size,
+      ),
+      padding: const EdgeInsets.all(8),
+      constraints: const BoxConstraints(),
+      onPressed: onPressed,
     );
   }
 } 

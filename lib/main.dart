@@ -8,6 +8,7 @@ import 'package:record/features/home/presentation/bloc/home_bloc.dart';
 import 'package:record/features/home/presentation/bloc/home_event.dart';
 import 'package:record/features/tags/presentation/bloc/tag_list_bloc.dart';
 import 'package:record/features/main_shell/presentation/bloc/main_shell_cubit.dart';
+import 'package:record/data/database/connection/native.dart' show closeDatabase;
 
 // 全局单例，避免重复创建
 late final AppDatabase _database;
@@ -88,7 +89,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
 
   void _closeDatabase() {
     try {
-      _database.close();
+      // 使用connection.dart中的closeDatabase方法
+      closeDatabase();
       debugPrint('Database connection closed');
     } catch (e) {
       debugPrint('Failed to close database: $e');

@@ -92,10 +92,13 @@ class NoteCard extends StatelessWidget {
                             children: [
                               Icon(Icons.location_on_outlined, size: 10, color: Colors.grey.shade600),
                               const SizedBox(width: 2), // 更小的间距
-                              Text(
-                                note.locationInfo!,
-                                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                                overflow: TextOverflow.ellipsis,
+                              Flexible(
+                                child: Text(
+                                  note.locationInfo!,
+                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               ),
                             ],
                           ),

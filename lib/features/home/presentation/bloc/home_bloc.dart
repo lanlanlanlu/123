@@ -16,6 +16,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       : _notesRepository = notesRepository,
         super(const HomeInitial()) {
     on<HomeLoadNotes>(_onLoadNotes);
+    on<HomeLoadNotesByLocation>(_onLoadNotesByLocation);
     on<HomeNoteDeleted>(_onNoteDeleted);
     on<HomeNoteRestored>(_onNoteRestored);
     on<HomeNotesUpdated>(_onNotesUpdated);
@@ -45,6 +46,35 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         (notes) => add(HomeNotesUpdated(notes)),
         onError: (error) => add(HomeNotesError(error.toString())),
       );
+  }
+
+  /// 处理加载特定位置笔记事件
+  Future<void> _onLoadNotesByLocation(HomeLoadNotesByLocation event, Emitter<HomeState> emit) async {
+    emit(const HomeLoading());
+    
+    // 取消之前的订阅（如果有）
+    await _notesSubscription?.cancel();
+    
+    try {
+      // 短暂延迟后订阅笔记流，给UI渲染一些时间
+      await Future.delayed(const Duration(milliseconds: 50));
+      
+      // 使用批量加载策略订阅特定位置的笔记流
+      _notesSubscription = _notesRepository.watchNotesByLocation(event.location)
+        .asyncMap((notes) async {
+          // 如果笔记数量很多，考虑分批加载或限制数量
+          if (notes.length > 100) {
+            return notes.take(100).toList();
+          }
+          return notes;
+        })
+        .listen(
+          (notes) => add(HomeNotesUpdated(notes)),
+          onError: (error) => add(HomeNotesError(error.toString())),
+        );
+    } catch (e) {
+      emit(HomeLoadFailure('加载位置笔记失败: ${e.toString()}'));
+    }
   }
 
   /// 处理笔记更新事件（内部使用，不暴露给UI）
