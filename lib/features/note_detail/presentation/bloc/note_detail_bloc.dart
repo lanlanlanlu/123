@@ -33,6 +33,7 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
     on<NoteDetailAddTag>(_onAddTag);
     on<NoteDetailRemoveTag>(_onRemoveTag);
     on<NoteDetailUpdateImages>(_onUpdateImages);
+    on<NoteDetailToggleThumbnailMode>(_onToggleThumbnailMode);
     
     // 内部事件处理
     on<_NoteDetailUpdated>(_onNoteUpdated);
@@ -353,6 +354,18 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
   /// 处理错误事件
   Future<void> _onError(_NoteDetailError event, Emitter<NoteDetailState> emit) async {
     emit(NoteDetailLoadFailure(event.message));
+  }
+
+  /// 处理切换小图模式事件
+  Future<void> _onToggleThumbnailMode(NoteDetailToggleThumbnailMode event, Emitter<NoteDetailState> emit) async {
+    final currentState = state;
+    
+    if (currentState is NoteDetailLoaded) {
+      // 反转当前的小图模式状态
+      emit(currentState.copyWith(
+        thumbnailMode: !currentState.thumbnailMode,
+      ));
+    }
   }
 
   @override

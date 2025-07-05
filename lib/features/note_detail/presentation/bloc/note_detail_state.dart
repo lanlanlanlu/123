@@ -38,6 +38,7 @@ class NoteDetailLoaded extends NoteDetailState {
   final String? draftTitle;
   final bool hasImageChanges; // 是否有图片变更
   final int imageChangeCount; // 图片变更计数
+  final bool thumbnailMode; // 是否启用小图模式，在此模式下不直接显示Markdown中的图片
   
   const NoteDetailLoaded({
     required this.note,
@@ -47,6 +48,7 @@ class NoteDetailLoaded extends NoteDetailState {
     this.draftTitle,
     this.hasImageChanges = false,
     this.imageChangeCount = 0,
+    this.thumbnailMode = false,
   });
   
   /// 当前展示的标题（草稿或原始标题）
@@ -65,6 +67,7 @@ class NoteDetailLoaded extends NoteDetailState {
     bool? hasUnsavedChanges,
     bool? hasImageChanges,
     int? imageChangeCount,
+    bool? thumbnailMode,
     bool clearDraft = false,
   }) {
     return NoteDetailLoaded(
@@ -75,6 +78,7 @@ class NoteDetailLoaded extends NoteDetailState {
       draftTitle: clearDraft ? null : (draftTitle ?? this.draftTitle),
       hasImageChanges: clearDraft ? false : (hasImageChanges ?? this.hasImageChanges),
       imageChangeCount: clearDraft ? 0 : (imageChangeCount ?? this.imageChangeCount),
+      thumbnailMode: thumbnailMode ?? this.thumbnailMode,
     );
   }
   
@@ -82,7 +86,7 @@ class NoteDetailLoaded extends NoteDetailState {
   bool get hasUnsavedChanges => draftContent != null || draftTitle != null || hasImageChanges;
   
   @override
-  List<Object?> get props => [note, editMode, tags, draftContent, draftTitle, hasImageChanges, imageChangeCount];
+  List<Object?> get props => [note, editMode, tags, draftContent, draftTitle, hasImageChanges, imageChangeCount, thumbnailMode];
 }
 
 /// 加载失败状态

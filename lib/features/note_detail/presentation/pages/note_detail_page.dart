@@ -17,6 +17,7 @@ import 'package:record/features/note_detail/presentation/bloc/note_detail_state.
 import 'package:record/features/tags/presentation/pages/tag_detail_page.dart';
 import 'package:record/core/widgets/interactive_text.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 
 // 导入重构后的组件
 import 'package:record/features/note_detail/presentation/widgets/note_editor_widget.dart';
@@ -25,6 +26,9 @@ import 'package:record/features/note_detail/presentation/widgets/note_reading_wi
 import 'package:record/features/note_detail/presentation/widgets/note_image_grid.dart';
 import 'package:record/features/note_detail/presentation/widgets/note_edit_actions_bar.dart';
 import 'package:record/features/note_detail/presentation/widgets/note_utils.dart';
+// 导入Quill编辑器组件
+import 'package:record/features/note_detail/presentation/widgets/quill_editor_widget.dart';
+import 'package:record/features/note_detail/presentation/widgets/quill_preview_widget.dart';
 
 class NoteDetailPage extends StatelessWidget {
   final Note note;
@@ -55,6 +59,9 @@ class _NoteDetailViewState extends State<NoteDetailView> {
   late TextEditingController _textController;
   late TextEditingController _titleController;
   final FocusNode _focusNode = FocusNode();
+  
+  // 修改GlobalKey类型为通用State类型
+  final GlobalKey<State<QuillEditorWidget>> _quillEditorKey = GlobalKey<State<QuillEditorWidget>>();
 
   // 编辑历史管理
   final List<String> _undoHistory = [];
@@ -252,63 +259,19 @@ class _NoteDetailViewState extends State<NoteDetailView> {
   }
 
   // 处理删除标签
-  void _handleTagRemoved(String tagName) async {
-
-    // 查找并删除标签
-    final text = _textController.text;
-    
-    // 使用更精确的正则表达式匹配标签
-    // 处理多种情况：行首、空格后、标点符号后等
-    String newText = text;
-    
-    // 1. 处理行首的标签
-    final startPattern = RegExp(r'^#' + RegExp.escape(tagName) + r'(?=\s|$)');
-    newText = newText.replaceAll(startPattern, '');
-    
-    // 2. 处理空格后的标签
-    final spacePattern = RegExp(r'(\s)#' + RegExp.escape(tagName) + r'(?=\s|$)');
-    newText = newText.replaceAll(spacePattern, r'$1');
-    
-    // 3. 处理特殊情况：标签在行中间或结尾
-    final anywherePattern = RegExp(r'#' + RegExp.escape(tagName) + r'\b');
-    if (newText.contains(anywherePattern)) {
-      newText = newText.replaceAll(anywherePattern, '');
-    }
-    
-    
-    // 更新文本控制器
-    setState(() {
-      _textController.text = newText;
-      _lastText = newText;
-    });
-    
-    // 通知BLoC内容已更新
-    context.read<NoteDetailBloc>().add(NoteDetailUpdateContent(newText));
-    
-    // 从数据库中查找并删除标签关联
-    
-      final state = context.read<NoteDetailBloc>().state;
-      if (state is NoteDetailLoaded) {
-        final noteId = state.note.id;
-        final tagsRepository = context.read<TagsRepository>();
-        
-        // 获取当前笔记的所有标签
-        final tags = await tagsRepository.getTagsForNote(noteId);
-        
-        // 查找匹配的标签
-        for (final tag in tags) {
-          if (tag.name == tagName) {
-            // 从数据库中删除标签关联
-            await tagsRepository.removeTagFromNote(noteId, tag.id);
-            
-            // 通知Bloc标签已删除
-            context.read<NoteDetailBloc>().add(NoteDetailRemoveTag(tag.id));
-            break;
-          }
-        }
+  void _handleTagRemoved(String tagName) {
+    final currentState = context.read<NoteDetailBloc>().state;
+    if (currentState is NoteDetailLoaded) {
+      // 查找与该名称匹配的标签
+      final tag = currentState.tags.firstWhere(
+        (t) => t.name == tagName,
+        orElse: () => Tag(id: -1, name: ''),
+      );
+      
+      if (tag.id != -1) {
+        context.read<NoteDetailBloc>().add(NoteDetailRemoveTag(tag.id));
       }
-    
-    
+    }
   }
 
   List<Widget> _buildAppBarActions(NoteDetailLoaded state) {
@@ -369,6 +332,11 @@ class _NoteDetailViewState extends State<NoteDetailView> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<NoteDetailBloc, NoteDetailState>(
+      listenWhen: (previous, current) {
+        // 只有当状态从NoteDetailLoaded变为其他状态或操作成功时才响应
+        return (previous is NoteDetailLoaded && !(current is NoteDetailLoaded)) ||
+          current is NoteDetailOperationSuccess;
+      },
       listener: (context, state) {
         if (state is NoteDetailOperationSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -378,13 +346,6 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.message)),
           );
-        } else if (state is NoteDetailLoaded) {
-          // 当状态变为已加载，且编辑模式发生变化时，更新控制器
-          if (state.editMode == NoteEditMode.reading && _textController.text != state.note.content) {
-            _textController.text = state.note.content;
-            _titleController.text = NoteUtils.getTitle(state.note.content);
-            _lastText = state.note.content;
-          }
         }
       },
       builder: (context, state) {
@@ -392,129 +353,226 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
-        }
-        
-        if (state is NoteDetailLoaded) {
-          final note = state.note;
-          final theme = Theme.of(context);
-          final isEditing = state.editMode == NoteEditMode.editing;
-          final isPreviewMode = state.editMode == NoteEditMode.previewing;
-
-          // 添加WillPopScope处理退出时自动保存
+        } else if (state is NoteDetailLoaded) {
           return WillPopScope(
+            // 拦截返回事件，检查是否有未保存的更改
             onWillPop: () async {
-              // 检查是否有未保存的更改
-              if (state.hasUnsavedChanges || _textController.text != state.note.content) {
-                // 自动保存笔记
-                await _saveNote();
+              if (state.hasUnsavedChanges) {
+                // 如果有未保存的更改，提示用户是否保存
+                final shouldSave = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('有未保存的更改'),
+                    content: const Text('是否保存更改？'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('不保存'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('保存'),
+                      ),
+                    ],
+                  ),
+                );
+                
+                if (shouldSave == true) {
+                  await _saveNote();
+                }
               }
               return true;
             },
             child: Scaffold(
-            resizeToAvoidBottomInset: false,
-            appBar: AppBar(
-              centerTitle: false,
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '修改于 ${note.updatedAt.month}月${note.updatedAt.day}日, ${note.updatedAt.toYYMMDD()}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
-                  ),
-                  if (note.locationInfo != null && note.locationInfo!.isNotEmpty)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.location_on, size: 12, color: Colors.grey.shade600),
-                        const SizedBox(width: 2),
-                        Flexible(
-                          child: Text(
-                            note.locationInfo!,
-                            style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+              key: _scaffoldKey,
+              appBar: AppBar(
+                title: Text(state.note.title.isEmpty ? '新建笔记' : state.note.title),
+                actions: [
+                  // 根据不同状态显示相应按钮
+                  // 编辑模式：显示保存按钮
+                  if (state.editMode == NoteEditMode.editing)
+                    IconButton(
+                      icon: const Icon(Icons.save),
+                      onPressed: _saveNote,
+                      tooltip: '保存笔记',
+                    )
+                  // 阅读模式：显示编辑按钮
+                  else if (state.editMode == NoteEditMode.reading)
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: _switchToEditMode,
+                      tooltip: '编辑笔记',
+                    )
+                  // 预览模式：显示返回编辑按钮
+                  else if (state.editMode == NoteEditMode.previewing)
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => context.read<NoteDetailBloc>().add(const NoteDetailToggleEditMode()),
+                      tooltip: '返回编辑',
                     ),
-                ],
-              ),
-              actions: _buildAppBarActions(state),
-            ),
-            body: Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  
+                  // 编辑模式下额外显示预览按钮
+                  if (state.editMode == NoteEditMode.editing)
+                    IconButton(
+                      icon: const Icon(Icons.preview),
+                      onPressed: () => context.read<NoteDetailBloc>().add(const NoteDetailToggleEditMode()),
+                      tooltip: '预览内容',
+                    ),
+                  
+                  // 菜单选项
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        _showDeleteConfirmation(context);
+                      } else if (value == 'share') {
+                        _shareNoteContent(context, state.displayContent);
+                      } else if (value == 'thumbnail') {
+                        context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode());
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'thumbnail',
+                        child: Row(
                           children: [
-                            // 使用重构后的组件显示内容
-                            if (isEditing || isPreviewMode) 
-                              !isPreviewMode
-                                ? NoteEditorWidget(
-                                    titleController: _titleController,
-                                    textController: _textController,
-                                    focusNode: _focusNode,
-                                    noteId: note.id,
-                                    onTitleChanged: _updateContentFromTitle,
-                                    onDeleteImage: _handleDeleteImage,
-                                    onTagRemoved: _handleTagRemoved,
-                                  )
-                                : NotePreviewWidget(
-                                    content: _textController.text,
-                                    title: _titleController.text,
-                                    noteId: note.id,
-                                    onDeleteImage: _handleDeleteImage,
-                                    onTagRemoved: _handleTagRemoved,
-                                  )
-                            else
-                              NoteReadingWidget(
-                                note: note,
-                                onTap: _switchToEditMode,
-                                getTitleFn: NoteUtils.getTitle,
-                                getContentBodyFn: NoteUtils.getContentBody,
-                              ),
-                            
-                            const SizedBox(height: 16),
-                            
-                            // 使用重构后的图片网格组件
-                            NoteImageGrid(
-                              noteId: note.id,
-                              isEditing: isEditing,
-                              newImagePaths: _newImagePaths,
-                              deletedImagePaths: _deletedImagePaths,
-                              onDeleteImage: isEditing ? _handleDeleteImage : null,
+                            Icon(
+                              state.thumbnailMode ? Icons.image : Icons.image_outlined,
+                              color: Theme.of(context).iconTheme.color,
                             ),
+                            const SizedBox(width: 8),
+                            Text(state.thumbnailMode ? '显示图片' : '隐藏图片'),
                           ],
                         ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'share',
+                        child: Row(
+                          children: [
+                            Icon(Icons.share),
+                            SizedBox(width: 8),
+                            Text('分享笔记'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('删除', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              body: Column(
+                children: [
+                  // 主内容区域
+                  Expanded(
+                    child: SafeArea(
+                      // 不为底部添加安全区域，工具栏会自己处理
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
+                        child: _buildContent(state),
                       ),
                     ),
                   ),
                   
-                  // 使用重构后的编辑操作栏组件
-                  if (isEditing && !isPreviewMode)
+                  // 当处于编辑模式时显示底部工具栏，直接放在Column底部
+                  if (state.editMode == NoteEditMode.editing)
                     NoteEditActionsBar(
                       onInsertText: _insertTextAtCursor,
                       onPickImage: _pickImageFromGallery,
                       onTakePhoto: () {}, // 暂不实现拍照功能
                       onSave: _saveNote,
+                      onFormatText: (prefix, suffix) {
+                        _insertFormattedTextAtCursor(prefix, suffix);
+                      },
+                      onInsertList: (marker) {
+                        _insertTextAtCursor('$marker ');
+                      },
                     ),
                 ],
               ),
+              
+              // 移除底部字数统计，所有模式下都不显示底部导航栏
+              bottomNavigationBar: const SizedBox.shrink(),
             ),
-          ),
+          );
+        } else {
+          // 处理错误状态
+          return Scaffold(
+            appBar: AppBar(title: const Text('笔记详情')),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    state is NoteDetailLoadFailure
+                        ? state.message
+                        : '未知错误',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      // 重新加载笔记
+                      context.read<NoteDetailBloc>().add(NoteDetailLoadNote(widget.initialNote.id));
+                    },
+                    child: const Text('重试'),
+                  ),
+                ],
+              ),
+            ),
           );
         }
-        
-        // 默认显示加载中
-        return const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        );
       },
     );
+  }
+
+  // 构建主内容区域
+  Widget _buildContent(NoteDetailLoaded state) {
+    switch (state.editMode) {
+      case NoteEditMode.reading:
+        return NoteReadingWidget(
+          note: state.note,
+          onTap: _switchToEditMode,
+          getTitleFn: (content) => state.note.title,
+          getContentBodyFn: (content) => state.note.content,
+          thumbnailMode: state.thumbnailMode,
+        );
+      case NoteEditMode.editing:
+        // 使用QuillEditorWidget替代NoteEditorWidget
+        return QuillEditorWidget(
+          key: _quillEditorKey,
+          noteId: state.note.id,
+          titleController: _titleController,
+          content: _textController.text,
+          focusNode: _focusNode,
+          onTitleChanged: _updateContentFromTitle,
+          onContentChanged: (content) {
+            context.read<NoteDetailBloc>().add(NoteDetailUpdateContent(content));
+          },
+          onDeleteImage: _handleDeleteImage,
+          onTagRemoved: _handleTagRemoved,
+          thumbnailMode: state.thumbnailMode,
+        );
+      case NoteEditMode.previewing:
+        return QuillPreviewWidget(
+          noteId: state.note.id,
+          title: state.displayTitle,
+          content: state.displayContent,
+          onDeleteImage: null,
+          onTagRemoved: null,
+          thumbnailMode: state.thumbnailMode,
+        );
+    }
   }
 
   // 撤销操作
@@ -567,5 +625,68 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     
     // 通知BLoC内容已更新
     context.read<NoteDetailBloc>().add(NoteDetailUpdateContent(nextText));
+  }
+
+  // 在光标位置插入带格式的文本
+  void _insertFormattedTextAtCursor(String prefix, String suffix) {
+    final selection = _textController.selection;
+    final text = _textController.text;
+    
+    if (selection.isCollapsed) {
+      // 光标位置，没有选中文本
+      final newText = text.substring(0, selection.baseOffset) + 
+                    prefix + suffix + 
+                    text.substring(selection.baseOffset);
+      
+      _textController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: selection.baseOffset + prefix.length
+        ),
+      );
+    } else {
+      // 选中了文本
+      final selectedText = text.substring(selection.baseOffset, selection.extentOffset);
+      final newText = text.substring(0, selection.baseOffset) + 
+                   prefix + selectedText + suffix + 
+                   text.substring(selection.extentOffset);
+      
+      _textController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: selection.baseOffset + prefix.length + selectedText.length + suffix.length
+        ),
+      );
+    }
+  }
+
+  // 添加缺失的分享方法
+  void _shareNoteContent(BuildContext context, String content) {
+    Share.share(content);
+  }
+
+  // 添加确认删除方法
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除笔记'),
+        content: const Text('确定要删除此笔记吗？此操作无法撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.read<NoteDetailBloc>().add(const NoteDetailDeleteNote());
+              context.pop();
+            },
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 }

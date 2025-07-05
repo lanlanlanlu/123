@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:record/data/database/database.dart';
-import 'package:record/features/note_detail/presentation/widgets/markdown_format_menu.dart';
+
 
 /// 笔记编辑操作栏组件
 class NoteEditActionsBar extends StatelessWidget {
@@ -16,6 +16,12 @@ class NoteEditActionsBar extends StatelessWidget {
   
   /// 保存笔记的回调
   final VoidCallback onSave;
+  
+  /// 格式化文本回调 - 添加粗体、斜体等格式
+  final Function(String prefix, String suffix)? onFormatText;
+  
+  /// 插入列表回调 - 添加项目符号、数字列表等
+  final Function(String marker)? onInsertList;
 
   const NoteEditActionsBar({
     super.key,
@@ -23,11 +29,14 @@ class NoteEditActionsBar extends StatelessWidget {
     required this.onPickImage,
     required this.onTakePhoto,
     required this.onSave,
+    this.onFormatText,
+    this.onInsertList,
   });
 
   @override
   Widget build(BuildContext context) {
     final database = Provider.of<AppDatabase>(context);
+    final toolbarIconSize = 20.0;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -41,35 +50,110 @@ class NoteEditActionsBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          // 格式工具栏
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // 粗体按钮
+                IconButton(
+                  icon: const Icon(Icons.format_bold),
+                  iconSize: toolbarIconSize,
+                  onPressed: () {
+                    if (onFormatText != null) {
+                      onFormatText!('**', '**');
+                    } else {
+                      onInsertText('**粗体文本**');
+                    }
+                  },
+                  tooltip: '粗体',
+                ),
+                // 斜体按钮
+                IconButton(
+                  icon: const Icon(Icons.format_italic),
+                  iconSize: toolbarIconSize,
+                  onPressed: () {
+                    if (onFormatText != null) {
+                      onFormatText!('*', '*');
+                    } else {
+                      onInsertText('*斜体文本*');
+                    }
+                  },
+                  tooltip: '斜体',
+                ),
+                // 项目符号列表
+                IconButton(
+                  icon: const Icon(Icons.format_list_bulleted),
+                  iconSize: toolbarIconSize,
+                  onPressed: () {
+                    if (onInsertList != null) {
+                      onInsertList!('- ');
+                    } else {
+                      onInsertText('- 列表项\n');
+                    }
+                  },
+                  tooltip: '项目符号列表',
+                ),
+                // 数字列表
+                IconButton(
+                  icon: const Icon(Icons.format_list_numbered),
+                  iconSize: toolbarIconSize,
+                  onPressed: () {
+                    if (onInsertList != null) {
+                      onInsertList!('1. ');
+                    } else {
+                      onInsertText('1. 列表项\n');
+                    }
+                  },
+                  tooltip: '数字列表',
+                ),
+                // 引用
+                IconButton(
+                  icon: const Icon(Icons.format_quote),
+                  iconSize: toolbarIconSize,
+                  onPressed: () {
+                    if (onInsertList != null) {
+                      onInsertList!('> ');
+                    } else {
+                      onInsertText('> 引用文本\n');
+                    }
+                  },
+                  tooltip: '引用',
+                ),
+              ],
+            ),
+          ),
+          
+          // 主工具栏
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildLocationButton(context, database),
-              _buildTagButton(context, database),
-              IconButton(
-                onPressed: onPickImage,
-                icon: const Icon(Icons.image_outlined),
-                tooltip: '从相册选择',
+              Row(
+                children: [
+                  _buildLocationButton(context, database),
+                  _buildTagButton(context, database),
+                  IconButton(
+                    onPressed: onPickImage,
+                    icon: const Icon(Icons.image_outlined),
+                    tooltip: '从相册选择',
+                  ),
+                  IconButton(
+                    onPressed: onTakePhoto, 
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    tooltip: '拍照',
+                  ),
+                ],
               ),
               IconButton(
-                onPressed: onTakePhoto, 
-                icon: const Icon(Icons.camera_alt_outlined),
-                tooltip: '拍照',
-              ),
-              IconButton(
-                onPressed: () => MarkdownFormatMenu.show(context, onInsertText),
-                icon: const Icon(Icons.text_format),
-                tooltip: 'Markdown格式',
-              ),
+                onPressed: onSave,
+                icon: const Icon(Icons.send),
+                tooltip: '保存',
+              )
             ],
           ),
-          IconButton(
-            onPressed: onSave,
-            icon: const Icon(Icons.send),
-            tooltip: '保存',
-          )
         ],
       ),
     );

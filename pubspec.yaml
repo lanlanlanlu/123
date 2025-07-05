@@ -47,6 +47,10 @@ dependencies:
   # image_gallery_saver: ^2.0.3
   share_plus: ^11.0.0
   cross_file: ^0.3.4+2
+  logger: ^2.6.0
+
+  extended_text_field: ^11.0.1
+  flutter_quill: ^11.4.1
 
 dev_dependencies:
   flutter_test:

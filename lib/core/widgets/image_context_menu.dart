@@ -12,6 +12,9 @@ class ImageContextMenu extends StatefulWidget {
   /// 小图模式回调
   final ImageMenuCallback? onThumbnailMode;
   
+  /// 小图模式按钮文本
+  final String thumbnailModeText;
+  
   /// 复制回调
   final ImageMenuCallback? onCopy;
   
@@ -28,6 +31,7 @@ class ImageContextMenu extends StatefulWidget {
     super.key,
     required this.position,
     this.onThumbnailMode,
+    this.thumbnailModeText = '小图模式',
     this.onCopy,
     this.onShare,
     this.onSave,
@@ -39,6 +43,7 @@ class ImageContextMenu extends StatefulWidget {
     required BuildContext context,
     required Offset position,
     ImageMenuCallback? onThumbnailMode,
+    String thumbnailModeText = '小图模式',
     ImageMenuCallback? onCopy,
     ImageMenuCallback? onShare,
     ImageMenuCallback? onSave,
@@ -57,6 +62,7 @@ class ImageContextMenu extends StatefulWidget {
       pageBuilder: (context, _, __) => ImageContextMenu(
         position: position,
         onThumbnailMode: onThumbnailMode,
+        thumbnailModeText: thumbnailModeText,
         onCopy: onCopy,
         onShare: onShare,
         onSave: onSave,
@@ -158,7 +164,7 @@ class _ImageContextMenuState extends State<ImageContextMenu> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (widget.onThumbnailMode != null) _buildMenuItem('小图模式', widget.onThumbnailMode!),
+                    if (widget.onThumbnailMode != null) _buildMenuItem(widget.thumbnailModeText, widget.onThumbnailMode!),
                     if (widget.onCopy != null) ...[
                       if (widget.onThumbnailMode != null) _buildDivider(),
                       _buildMenuItem('复制', widget.onCopy!),

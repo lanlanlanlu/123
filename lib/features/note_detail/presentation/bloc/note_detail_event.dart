@@ -86,4 +86,9 @@ class NoteDetailUpdateImages extends NoteDetailEvent {
 
   @override
   List<Object?> get props => [newImagePaths, deletedImagePaths];
+}
+
+/// 切换小图模式事件
+class NoteDetailToggleThumbnailMode extends NoteDetailEvent {
+  const NoteDetailToggleThumbnailMode();
 } 

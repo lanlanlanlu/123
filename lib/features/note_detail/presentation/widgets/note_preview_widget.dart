@@ -2,8 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:record/core/widgets/image_context_menu.dart';
+import 'package:record/features/note_detail/presentation/bloc/note_detail_bloc.dart';
+import 'package:record/features/note_detail/presentation/bloc/note_detail_event.dart';
 import 'package:record/features/note_detail/presentation/widgets/stats_and_tags_bar.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -24,6 +27,9 @@ class NotePreviewWidget extends StatelessWidget {
 
   /// 删除标签回调
   final Function(String)? onTagRemoved;
+  
+  /// 是否启用小图模式
+  final bool thumbnailMode;
 
   const NotePreviewWidget({
     super.key,
@@ -32,6 +38,7 @@ class NotePreviewWidget extends StatelessWidget {
     required this.noteId,
     this.onDeleteImage,
     this.onTagRemoved,
+    this.thumbnailMode = false,
   });
 
   @override
@@ -70,6 +77,7 @@ class NotePreviewWidget extends StatelessWidget {
 
   Widget _buildMarkdownPreview(BuildContext context) {
     return MarkdownBody(
+      key: ValueKey('markdown_preview_${thumbnailMode ? 'thumbnail' : 'full'}'),
       data: content,
       selectable: true,
       styleSheet: MarkdownStyleSheet(
@@ -99,6 +107,12 @@ class NotePreviewWidget extends StatelessWidget {
         }
       },
       imageBuilder: (uri, title, alt) {
+        // 在小图模式下不显示图片
+        if (thumbnailMode) {
+          // 返回空容器以避免在Markdown中留下空间
+          return const SizedBox.shrink();
+        }
+        
         // 处理本地图片
         if (uri.scheme == 'file' || uri.scheme == '') {
           final path = uri.toString().replaceAll('file://', '');
@@ -186,8 +200,10 @@ class NotePreviewWidget extends StatelessWidget {
       context: context,
       position: tapPosition,
       onThumbnailMode: () {
-        // 小图模式未实现
+        // 触发小图模式切换事件
+        context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode());
       },
+      thumbnailModeText: thumbnailMode ? '大图模式' : '小图模式',
       onCopy: () => _copyImageToClipboard(context, path),
       onShare: () => _shareImage(context, path),
       onSave: () => _saveImage(context, path),

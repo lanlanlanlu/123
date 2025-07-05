@@ -2,8 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:record/core/widgets/image_context_menu.dart';
+import 'package:record/features/note_detail/presentation/bloc/note_detail_bloc.dart';
+import 'package:record/features/note_detail/presentation/bloc/note_detail_event.dart';
+import 'package:record/features/note_detail/presentation/bloc/note_detail_state.dart';
 import 'package:record/features/note_detail/presentation/widgets/stats_and_tags_bar.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -29,6 +33,9 @@ class NoteEditorWidget extends StatelessWidget {
 
   /// 删除标签回调 - 用于从数据库中删除标签
   final Function(String)? onTagRemoved;
+  
+  /// 是否启用小图模式
+  final bool thumbnailMode;
 
   const NoteEditorWidget({
     super.key,
@@ -39,6 +46,7 @@ class NoteEditorWidget extends StatelessWidget {
     required this.onTitleChanged,
     this.onDeleteImage,
     this.onTagRemoved,
+    this.thumbnailMode = false,
   });
 
   // 处理删除标签
@@ -117,6 +125,7 @@ class NoteEditorWidget extends StatelessWidget {
         
         // 内容输入框
         TextField(
+          key: ValueKey('note_editor_${thumbnailMode ? 'thumbnail' : 'full'}'),
           controller: textController,
           focusNode: focusNode,
           maxLines: null,
@@ -128,12 +137,14 @@ class NoteEditorWidget extends StatelessWidget {
           decoration: const InputDecoration(border: InputBorder.none),
         ),
         
-        // 实时预览图片（保持原始尺寸）
-        _MarkdownImagesPreview(
-          content: textController.text,
-          textController: textController,
-          onDeleteImage: onDeleteImage,
-        ),
+        // 实时预览图片（仅在非小图模式下显示）
+        if (!thumbnailMode)
+          _MarkdownImagesPreview(
+            key: const ValueKey('markdown_images_preview'),
+            content: textController.text,
+            textController: textController,
+            onDeleteImage: onDeleteImage,
+          ),
       ],
     );
   }
@@ -146,6 +157,7 @@ class _MarkdownImagesPreview extends StatelessWidget {
   final Function(String)? onDeleteImage;
 
   const _MarkdownImagesPreview({
+    super.key,
     required this.content,
     required this.textController,
     this.onDeleteImage,
@@ -241,12 +253,19 @@ class _MarkdownImagesPreview extends StatelessWidget {
   
   // 显示图片上下文菜单
   void _showImageContextMenu(BuildContext context, String path, String markdownSyntax, Offset tapPosition) {
+    // 获取当前小图模式状态
+    final isThumbnailMode = context.read<NoteDetailBloc>().state is NoteDetailLoaded 
+        ? (context.read<NoteDetailBloc>().state as NoteDetailLoaded).thumbnailMode 
+        : false;
+    
     ImageContextMenu.show(
       context: context,
       position: tapPosition,
       onThumbnailMode: () {
-        // 小图模式未实现
+        // 触发小图模式切换事件
+        context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode());
       },
+      thumbnailModeText: isThumbnailMode ? '大图模式' : '小图模式',
       onCopy: () => _copyImageToClipboard(context, path),
       onShare: () => _shareImage(context, path),
       onSave: () => _saveImage(context, path),
