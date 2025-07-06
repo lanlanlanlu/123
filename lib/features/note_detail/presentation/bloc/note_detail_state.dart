@@ -3,12 +3,8 @@ import 'package:record/data/database/database.dart';
 
 /// 笔记编辑模式
 enum NoteEditMode {
-  /// 阅读模式
-  reading,
   /// 编辑模式
-  editing,
-  /// 预览模式
-  previewing
+  editing
 }
 
 /// NoteDetail页面的所有状态基类
@@ -42,7 +38,7 @@ class NoteDetailLoaded extends NoteDetailState {
   
   const NoteDetailLoaded({
     required this.note,
-    this.editMode = NoteEditMode.reading,
+    this.editMode = NoteEditMode.editing,
     required this.tags,
     this.draftContent,
     this.draftTitle,

@@ -27,7 +27,6 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
     on<NoteDetailLoadNote>(_onLoadNote);
     on<NoteDetailUpdateContent>(_onUpdateContent);
     on<NoteDetailUpdateTitle>(_onUpdateTitle);
-    on<NoteDetailToggleEditMode>(_onToggleEditMode);
     on<NoteDetailSaveNote>(_onSaveNote);
     on<NoteDetailDeleteNote>(_onDeleteNote);
     on<NoteDetailAddTag>(_onAddTag);
@@ -80,6 +79,7 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
       emit(NoteDetailLoaded(
         note: event.note,
         tags: tags,
+        editMode: NoteEditMode.editing, // 直接进入编辑模式
       ));
     }
   }
@@ -108,89 +108,6 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
     
     if (currentState is NoteDetailLoaded) {
       emit(currentState.copyWith(draftTitle: event.title));
-    }
-  }
-
-  /// 处理切换编辑模式事件
-  Future<void> _onToggleEditMode(NoteDetailToggleEditMode event, Emitter<NoteDetailState> emit) async {
-    final currentState = state;
-    
-    if (currentState is NoteDetailLoaded) {
-      // 在阅读、编辑和预览模式之间循环
-      NoteEditMode nextMode;
-      switch (currentState.editMode) {
-        case NoteEditMode.reading:
-          nextMode = NoteEditMode.editing;
-          break;
-        case NoteEditMode.editing:
-          nextMode = NoteEditMode.previewing;
-          break;
-        case NoteEditMode.previewing:
-          // 从预览模式切换到编辑模式，而不是阅读模式
-          // 这样可以保留用户之前的编辑内容
-          nextMode = NoteEditMode.editing;
-          break;
-      }
-      
-      emit(currentState.copyWith(editMode: nextMode));
-    }
-  }
-
-  /// 处理更新图片事件
-  Future<void> _onUpdateImages(NoteDetailUpdateImages event, Emitter<NoteDetailState> emit) async {
-    if (_currentNoteId == null) {
-      emit(const NoteDetailLoadFailure('找不到当前笔记ID，无法更新图片'));
-      return;
-    }
-    
-    try {
-      // 1. 获取当前笔记的所有图片
-      final currentImages = await _notesRepository.getImagesForNote(_currentNoteId!);
-      final currentImagePaths = currentImages.map((img) => img.path).toList();
-      
-      // 2. 计算最终图片列表，使用Set确保唯一性
-      final Set<String> finalImagePathsSet = <String>{};
-      
-      // 首先添加当前图片中未被删除的
-      for (final path in currentImagePaths) {
-        if (!event.deletedImagePaths.contains(path)) {
-          finalImagePathsSet.add(path);
-        }
-      }
-      
-      // 添加新图片，Set自动处理重复项
-      finalImagePathsSet.addAll(event.newImagePaths);
-      
-      // 转换为列表
-      final finalImagePaths = finalImagePathsSet.toList();
-      
-      // 3. 检查是否有图片变更
-      bool hasImageChanges = event.newImagePaths.isNotEmpty || event.deletedImagePaths.isNotEmpty;
-      
-      // 4. 更新笔记的图片
-      await _notesRepository.updateImagesForNote(_currentNoteId!, finalImagePaths);
-      
-      // 5. 获取更新后的笔记并更新UI
-      final updatedNote = await _notesRepository.getNoteById(_currentNoteId!);
-      final currentState = state;
-      
-      if (currentState is NoteDetailLoaded) {
-        // 更新状态，包括图片变更标记
-        emit(currentState.copyWith(
-          note: updatedNote,
-          hasImageChanges: hasImageChanges,
-          imageChangeCount: currentState.imageChangeCount + 
-              (event.newImagePaths.length + event.deletedImagePaths.length),
-        ));
-      }
-    } catch (e) {
-      final currentState = state;
-      emit(NoteDetailLoadFailure('更新图片失败: ${e.toString()}'));
-      
-      // 恢复之前的状态
-      if (currentState is NoteDetailLoaded) {
-        emit(currentState);
-      }
     }
   }
 
@@ -273,7 +190,7 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
         // 清除草稿并切换到阅读模式，同时更新笔记对象
         emit(currentState.copyWith(
           clearDraft: true,
-          editMode: NoteEditMode.reading,
+          editMode: NoteEditMode.editing,
           note: updatedNote,
           hasImageChanges: false,
           imageChangeCount: 0,
@@ -282,7 +199,7 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
         // 恢复更新后的状态
         emit(currentState.copyWith(
           clearDraft: true,
-          editMode: NoteEditMode.reading,
+          editMode: NoteEditMode.editing,
           note: updatedNote,
           hasImageChanges: false,
           imageChangeCount: 0,
@@ -365,6 +282,64 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
       emit(currentState.copyWith(
         thumbnailMode: !currentState.thumbnailMode,
       ));
+    }
+  }
+
+  /// 处理更新图片事件
+  Future<void> _onUpdateImages(NoteDetailUpdateImages event, Emitter<NoteDetailState> emit) async {
+    if (_currentNoteId == null) {
+      emit(const NoteDetailLoadFailure('找不到当前笔记ID，无法更新图片'));
+      return;
+    }
+    
+    try {
+      // 1. 获取当前笔记的所有图片
+      final currentImages = await _notesRepository.getImagesForNote(_currentNoteId!);
+      final currentImagePaths = currentImages.map((img) => img.path).toList();
+      
+      // 2. 计算最终图片列表，使用Set确保唯一性
+      final Set<String> finalImagePathsSet = <String>{};
+      
+      // 首先添加当前图片中未被删除的
+      for (final path in currentImagePaths) {
+        if (!event.deletedImagePaths.contains(path)) {
+          finalImagePathsSet.add(path);
+        }
+      }
+      
+      // 添加新图片，Set自动处理重复项
+      finalImagePathsSet.addAll(event.newImagePaths);
+      
+      // 转换为列表
+      final finalImagePaths = finalImagePathsSet.toList();
+      
+      // 3. 检查是否有图片变更
+      bool hasImageChanges = event.newImagePaths.isNotEmpty || event.deletedImagePaths.isNotEmpty;
+      
+      // 4. 更新笔记的图片
+      await _notesRepository.updateImagesForNote(_currentNoteId!, finalImagePaths);
+      
+      // 5. 获取更新后的笔记并更新UI
+      final updatedNote = await _notesRepository.getNoteById(_currentNoteId!);
+      final currentState = state;
+      
+      if (currentState is NoteDetailLoaded) {
+        // 更新状态，包括图片变更标记
+        emit(currentState.copyWith(
+          note: updatedNote,
+          hasImageChanges: hasImageChanges,
+          imageChangeCount: currentState.imageChangeCount + 
+              (event.newImagePaths.length + event.deletedImagePaths.length),
+        ));
+      }
+    } catch (e) {
+      final currentState = state;
+      emit(NoteDetailLoadFailure('更新图片失败: ${e.toString()}'));
+      
+      // 恢复之前的状态
+      if (currentState is NoteDetailLoaded) {
+        emit(currentState);
+      }
     }
   }
 

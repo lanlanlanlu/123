@@ -8,7 +8,6 @@ import 'package:record/data/database/database.dart';
 import 'package:drift/drift.dart' as d;
 import 'package:record/core/utils/date_extensions.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/data/repository/index.dart';
 import 'package:record/features/note_detail/presentation/bloc/note_detail_bloc.dart';
@@ -20,15 +19,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
 // 导入重构后的组件
-import 'package:record/features/note_detail/presentation/widgets/note_editor_widget.dart';
-import 'package:record/features/note_detail/presentation/widgets/note_preview_widget.dart';
-import 'package:record/features/note_detail/presentation/widgets/note_reading_widget.dart';
 import 'package:record/features/note_detail/presentation/widgets/note_image_grid.dart';
 import 'package:record/features/note_detail/presentation/widgets/note_edit_actions_bar.dart';
 import 'package:record/features/note_detail/presentation/widgets/note_utils.dart';
 // 导入Quill编辑器组件
 import 'package:record/features/note_detail/presentation/widgets/quill_editor_widget.dart';
-import 'package:record/features/note_detail/presentation/widgets/quill_preview_widget.dart';
 
 class NoteDetailPage extends StatelessWidget {
   final Note note;
@@ -70,6 +65,7 @@ class _NoteDetailViewState extends State<NoteDetailView> {
   bool _isUndoRedo = false; // 标记当前变化是否由撤销/重做操作引起
   bool _isUpdatingFromTitle = false; // 标记是否由标题更新引起的文本变化
 
+  // 图片路径跟踪 - 由 QuillEditorWidget 管理，但仍需要在保存时收集
   final List<String> _newImagePaths = [];
   final List<String> _deletedImagePaths = [];
   final ImagePicker _picker = ImagePicker();
@@ -143,27 +139,6 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     setState(() {});
   }
 
-  void _switchToEditMode() {
-    // 通知BLoC切换到编辑模式
-    context.read<NoteDetailBloc>().add(const NoteDetailToggleEditMode());
-    
-    // 初始化文本和历史
-    final state = context.read<NoteDetailBloc>().state;
-    if (state is NoteDetailLoaded) {
-      // 从数据库获取内容
-      _textController.text = state.note.content;
-      // 设置标题（标题现在与内容分离）
-      _titleController.text = state.note.title;
-      _lastText = state.note.content;
-      _undoHistory.clear();
-      _redoHistory.clear();
-      
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if(mounted) FocusScope.of(context).requestFocus(_focusNode);
-      });
-    }
-  }
-
   Future<void> _saveNote() async {
     // 确保newImagePaths中没有重复项
     final Set<String> uniqueNewPaths = Set<String>.from(_newImagePaths);
@@ -183,51 +158,6 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     _redoHistory.clear();
     _newImagePaths.clear();
     _deletedImagePaths.clear();
-  }
-
-  // 在选择图片前，先请求权限
-  Future<void> _pickImageFromGallery() async {
-    // 1. 请求相册权限
-    final status = await Permission.photos.request();
-
-    // 2. 检查权限状态
-    if (status.isGranted) {
-      // 权限被授予，打开相册
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        await _copyImageAndInsertAtCursor(image);
-      }
-    } else if (status.isDenied || status.isPermanentlyDenied) {
-      // 权限被拒绝，给用户一个提示
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('需要相册权限才能选择图片')),
-        );
-      }
-    }
-  }
-
-  // 修改为在光标处插入图片
-  Future<void> _copyImageAndInsertAtCursor(XFile imageFile) async {
-    final documents = await getApplicationDocumentsDirectory();
-    final fileName = p.basename(imageFile.path);
-    // 1. 先构建好我们要保存的路径
-    final String newPath = '${documents.path}/$fileName';
-
-    // 2. 使用这个路径来保存文件
-    await imageFile.saveTo(newPath);
-
-    // 3. 添加到新图片路径列表中
-    setState(() {
-      _newImagePaths.add(newPath);
-    });
-    
-    // 4. 在光标处插入Markdown图片语法
-    // 使用原始尺寸的图片，不压缩或裁剪
-    final imageMarkdown = '![image]($newPath)';
-    _insertTextAtCursor(imageMarkdown);
-    
-    // 图片更新会在_saveNote方法中进行
   }
 
   // 一个在光标处插入文本的通用方法
@@ -271,61 +201,6 @@ class _NoteDetailViewState extends State<NoteDetailView> {
       if (tag.id != -1) {
         context.read<NoteDetailBloc>().add(NoteDetailRemoveTag(tag.id));
       }
-    }
-  }
-
-  List<Widget> _buildAppBarActions(NoteDetailLoaded state) {
-    if (state.editMode == NoteEditMode.editing || state.editMode == NoteEditMode.previewing) {
-      if (state.editMode == NoteEditMode.previewing) {
-        // 预览模式 - 显示编辑按钮
-        return [
-          IconButton(
-            onPressed: () {
-              // 确保在切换到编辑模式时保留预览前的内容
-              _textController.text = _lastText;
-              // 同步更新到Bloc状态以保持草稿
-              context.read<NoteDetailBloc>().add(NoteDetailUpdateContent(_lastText));
-              // 切换模式
-              context.read<NoteDetailBloc>().add(const NoteDetailToggleEditMode());
-              // 延迟一下再设置焦点，确保UI已经切换到编辑模式
-              Future.delayed(const Duration(milliseconds: 100), () {
-                if(mounted) FocusScope.of(context).requestFocus(_focusNode);
-              });
-            },
-            icon: const Icon(Icons.edit),
-            tooltip: '继续编辑',
-          ),
-        ];
-      } else {
-        // 编辑模式 - 显示撤销、重做和预览按钮
-        return [
-          IconButton(
-            onPressed: _undoHistory.isEmpty ? null : _undo,
-            icon: const Icon(Icons.undo),
-            tooltip: '撤销',
-          ),
-          IconButton(
-            onPressed: _redoHistory.isEmpty ? null : _redo,
-            icon: const Icon(Icons.redo),
-            tooltip: '重做',
-          ),
-          IconButton(
-            onPressed: () {
-              // 切换到预览模式前保存当前文本状态
-              _lastText = _textController.text;
-              // 确保Bloc状态保留编辑内容
-              context.read<NoteDetailBloc>().add(NoteDetailUpdateContent(_textController.text));
-              // 切换到预览模式
-              context.read<NoteDetailBloc>().add(const NoteDetailToggleEditMode());
-            },
-            icon: const Icon(Icons.remove_red_eye_outlined),
-            tooltip: '预览Markdown',
-          ),
-        ];
-      }
-    } else {
-      // 正常查看模式 - 不显示编辑按钮，因为点击内容可以进入编辑模式
-      return [];
     }
   }
 
@@ -388,36 +263,26 @@ class _NoteDetailViewState extends State<NoteDetailView> {
               appBar: AppBar(
                 title: Text(state.note.title.isEmpty ? '新建笔记' : state.note.title),
                 actions: [
-                  // 根据不同状态显示相应按钮
-                  // 编辑模式：显示保存按钮
-                  if (state.editMode == NoteEditMode.editing)
-                    IconButton(
-                      icon: const Icon(Icons.save),
-                      onPressed: _saveNote,
-                      tooltip: '保存笔记',
-                    )
-                  // 阅读模式：显示编辑按钮
-                  else if (state.editMode == NoteEditMode.reading)
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: _switchToEditMode,
-                      tooltip: '编辑笔记',
-                    )
-                  // 预览模式：显示返回编辑按钮
-                  else if (state.editMode == NoteEditMode.previewing)
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => context.read<NoteDetailBloc>().add(const NoteDetailToggleEditMode()),
-                      tooltip: '返回编辑',
-                    ),
+                  // 显示保存按钮
+                  IconButton(
+                    icon: const Icon(Icons.save),
+                    onPressed: _saveNote,
+                    tooltip: '保存笔记',
+                  ),
                   
-                  // 编辑模式下额外显示预览按钮
-                  if (state.editMode == NoteEditMode.editing)
-                    IconButton(
-                      icon: const Icon(Icons.preview),
-                      onPressed: () => context.read<NoteDetailBloc>().add(const NoteDetailToggleEditMode()),
-                      tooltip: '预览内容',
-                    ),
+                  // 撤销按钮
+                  IconButton(
+                    onPressed: _undoHistory.isEmpty ? null : _undo,
+                    icon: const Icon(Icons.undo),
+                    tooltip: '撤销',
+                  ),
+                  
+                  // 重做按钮
+                  IconButton(
+                    onPressed: _redoHistory.isEmpty ? null : _redo,
+                    icon: const Icon(Icons.redo),
+                    tooltip: '重做',
+                  ),
                   
                   // 菜单选项
                   PopupMenuButton<String>(
@@ -482,20 +347,26 @@ class _NoteDetailViewState extends State<NoteDetailView> {
                     ),
                   ),
                   
-                  // 当处于编辑模式时显示底部工具栏，直接放在Column底部
-                  if (state.editMode == NoteEditMode.editing)
-                    NoteEditActionsBar(
-                      onInsertText: _insertTextAtCursor,
-                      onPickImage: _pickImageFromGallery,
-                      onTakePhoto: () {}, // 暂不实现拍照功能
-                      onSave: _saveNote,
-                      onFormatText: (prefix, suffix) {
-                        _insertFormattedTextAtCursor(prefix, suffix);
-                      },
-                      onInsertList: (marker) {
-                        _insertTextAtCursor('$marker ');
-                      },
-                    ),
+                  // 显示底部工具栏
+                  NoteEditActionsBar(
+                    onInsertText: _insertTextAtCursor,
+                    onPickImage: () {
+                      final quillEditorState = _quillEditorKey.currentState;
+                      if (quillEditorState != null) {
+                        // 使用dynamic类型访问私有成员
+                        (quillEditorState as dynamic).insertImage();
+                      }
+                    },
+                    onTakePhoto: () {}, // 暂不实现拍照功能
+                    onSave: _saveNote,
+                    onFormatText: (prefix, suffix) {
+                      _insertFormattedTextAtCursor(prefix, suffix);
+                    },
+                    onInsertList: (marker) {
+                      _insertTextAtCursor('$marker ');
+                    },
+                    controller: QuillEditorWidget.getController(_quillEditorKey),
+                  ),
                 ],
               ),
               
@@ -538,41 +409,20 @@ class _NoteDetailViewState extends State<NoteDetailView> {
 
   // 构建主内容区域
   Widget _buildContent(NoteDetailLoaded state) {
-    switch (state.editMode) {
-      case NoteEditMode.reading:
-        return NoteReadingWidget(
-          note: state.note,
-          onTap: _switchToEditMode,
-          getTitleFn: (content) => state.note.title,
-          getContentBodyFn: (content) => state.note.content,
-          thumbnailMode: state.thumbnailMode,
-        );
-      case NoteEditMode.editing:
-        // 使用QuillEditorWidget替代NoteEditorWidget
-        return QuillEditorWidget(
-          key: _quillEditorKey,
-          noteId: state.note.id,
-          titleController: _titleController,
-          content: _textController.text,
-          focusNode: _focusNode,
-          onTitleChanged: _updateContentFromTitle,
-          onContentChanged: (content) {
-            context.read<NoteDetailBloc>().add(NoteDetailUpdateContent(content));
-          },
-          onDeleteImage: _handleDeleteImage,
-          onTagRemoved: _handleTagRemoved,
-          thumbnailMode: state.thumbnailMode,
-        );
-      case NoteEditMode.previewing:
-        return QuillPreviewWidget(
-          noteId: state.note.id,
-          title: state.displayTitle,
-          content: state.displayContent,
-          onDeleteImage: null,
-          onTagRemoved: null,
-          thumbnailMode: state.thumbnailMode,
-        );
-    }
+    return QuillEditorWidget(
+      key: _quillEditorKey,
+      noteId: state.note.id,
+      titleController: _titleController,
+      content: _textController.text,
+      focusNode: _focusNode,
+      onTitleChanged: _updateContentFromTitle,
+      onContentChanged: (content) {
+        context.read<NoteDetailBloc>().add(NoteDetailUpdateContent(content));
+      },
+      onDeleteImage: _handleDeleteImage,
+      onTagRemoved: _handleTagRemoved,
+      thumbnailMode: state.thumbnailMode,
+    );
   }
 
   // 撤销操作

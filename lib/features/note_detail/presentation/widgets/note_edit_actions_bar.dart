@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:record/data/database/database.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 
 
 /// 笔记编辑操作栏组件
@@ -22,6 +23,9 @@ class NoteEditActionsBar extends StatelessWidget {
   
   /// 插入列表回调 - 添加项目符号、数字列表等
   final Function(String marker)? onInsertList;
+  
+  /// QuillController 实例，用于直接控制编辑器
+  final QuillController? controller;
 
   const NoteEditActionsBar({
     super.key,
@@ -31,12 +35,13 @@ class NoteEditActionsBar extends StatelessWidget {
     required this.onSave,
     this.onFormatText,
     this.onInsertList,
+    this.controller,
   });
 
   @override
   Widget build(BuildContext context) {
     final database = Provider.of<AppDatabase>(context);
-    final toolbarIconSize = 20.0;
+    const toolbarIconSize = 20.0;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -50,116 +55,74 @@ class NoteEditActionsBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          // 格式工具栏
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                // 粗体按钮
-                IconButton(
-                  icon: const Icon(Icons.format_bold),
-                  iconSize: toolbarIconSize,
-                  onPressed: () {
-                    if (onFormatText != null) {
-                      onFormatText!('**', '**');
-                    } else {
-                      onInsertText('**粗体文本**');
-                    }
-                  },
-                  tooltip: '粗体',
-                ),
-                // 斜体按钮
-                IconButton(
-                  icon: const Icon(Icons.format_italic),
-                  iconSize: toolbarIconSize,
-                  onPressed: () {
-                    if (onFormatText != null) {
-                      onFormatText!('*', '*');
-                    } else {
-                      onInsertText('*斜体文本*');
-                    }
-                  },
-                  tooltip: '斜体',
-                ),
-                // 项目符号列表
-                IconButton(
-                  icon: const Icon(Icons.format_list_bulleted),
-                  iconSize: toolbarIconSize,
-                  onPressed: () {
-                    if (onInsertList != null) {
-                      onInsertList!('- ');
-                    } else {
-                      onInsertText('- 列表项\n');
-                    }
-                  },
-                  tooltip: '项目符号列表',
-                ),
-                // 数字列表
-                IconButton(
-                  icon: const Icon(Icons.format_list_numbered),
-                  iconSize: toolbarIconSize,
-                  onPressed: () {
-                    if (onInsertList != null) {
-                      onInsertList!('1. ');
-                    } else {
-                      onInsertText('1. 列表项\n');
-                    }
-                  },
-                  tooltip: '数字列表',
-                ),
-                // 引用
-                IconButton(
-                  icon: const Icon(Icons.format_quote),
-                  iconSize: toolbarIconSize,
-                  onPressed: () {
-                    if (onInsertList != null) {
-                      onInsertList!('> ');
-                    } else {
-                      onInsertText('> 引用文本\n');
-                    }
-                  },
-                  tooltip: '引用',
-                ),
-              ],
+          // 位置按钮
+          _buildLocationButton(context, database, toolbarIconSize),
+          
+          // 标签按钮
+          _buildTagButton(context, database, toolbarIconSize),
+          
+          // 格式化工具栏按钮 (Quill)
+          if (controller != null) ...[
+            // 加粗
+            IconButton(
+              icon: const Icon(Icons.format_bold),
+              iconSize: toolbarIconSize,
+              onPressed: () => _applyFormat(Attribute.bold),
+              tooltip: '加粗',
             ),
+          ],
+          
+          // 图片按钮
+          IconButton(
+            onPressed: onPickImage,
+            icon: const Icon(Icons.image_outlined),
+            iconSize: toolbarIconSize,
+            tooltip: '从相册选择',
           ),
           
-          // 主工具栏
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  _buildLocationButton(context, database),
-                  _buildTagButton(context, database),
-                  IconButton(
-                    onPressed: onPickImage,
-                    icon: const Icon(Icons.image_outlined),
-                    tooltip: '从相册选择',
-                  ),
-                  IconButton(
-                    onPressed: onTakePhoto, 
-                    icon: const Icon(Icons.camera_alt_outlined),
-                    tooltip: '拍照',
-                  ),
-                ],
-              ),
-              IconButton(
-                onPressed: onSave,
-                icon: const Icon(Icons.send),
-                tooltip: '保存',
-              )
-            ],
+          // 相机按钮
+          IconButton(
+            onPressed: onTakePhoto, 
+            icon: const Icon(Icons.camera_alt_outlined),
+            iconSize: toolbarIconSize,
+            tooltip: '拍照',
           ),
+          
+          // 右侧空间
+          const Spacer(),
+          
+          // 保存按钮
+          IconButton(
+            onPressed: onSave,
+            icon: const Icon(Icons.send),
+            tooltip: '保存',
+          )
         ],
       ),
     );
   }
   
-  Widget _buildLocationButton(BuildContext context, AppDatabase database) {
+  // 应用 Quill 格式
+  void _applyFormat(Attribute attribute) {
+    if (controller == null) return;
+    
+    final selection = controller!.selection;
+    if (selection.isCollapsed) {
+      // 如果没有选中文本，设置格式状态
+      controller!.formatSelection(attribute);
+    } else {
+      // 如果选中了文本，应用格式
+      controller!.formatText(
+        selection.baseOffset,
+        selection.extentOffset - selection.baseOffset,
+        attribute,
+      );
+    }
+  }
+  
+  Widget _buildLocationButton(BuildContext context, AppDatabase database, double iconSize) {
     return StreamBuilder<List<NoteLocation>>(
       stream: database.noteDao.watchLocationsForNote(-1), // 这里应该传入实际的noteId
       builder: (context, snapshot) {
@@ -168,12 +131,14 @@ class NoteEditActionsBar extends StatelessWidget {
           return IconButton(
             onPressed: () => onInsertText('@'),
             icon: const Icon(Icons.add_location_outlined),
+            iconSize: iconSize,
             tooltip: '添加位置',
           );
         }
         
         return PopupMenuButton<String>(
           icon: const Icon(Icons.add_location_outlined),
+          iconSize: iconSize,
           tooltip: '选择历史位置',
           onSelected: (String value) {
             onInsertText('@$value ');
@@ -191,7 +156,7 @@ class NoteEditActionsBar extends StatelessWidget {
     );
   }
   
-  Widget _buildTagButton(BuildContext context, AppDatabase database) {
+  Widget _buildTagButton(BuildContext context, AppDatabase database, double iconSize) {
     return StreamBuilder<List<Tag>>(
       stream: database.tagDao.watchRecentTags(),
       builder: (context, snapshot) {
@@ -200,12 +165,14 @@ class NoteEditActionsBar extends StatelessWidget {
           return IconButton(
             onPressed: () => onInsertText('#'),
             icon: const Icon(Icons.tag),
+            iconSize: iconSize,
             tooltip: '添加标签',
           );
         }
         
         return PopupMenuButton<Tag>(
           icon: const Icon(Icons.tag),
+          iconSize: iconSize,
           tooltip: '选择最近标签',
           onSelected: (Tag tag) {
             onInsertText('#${tag.name} ');

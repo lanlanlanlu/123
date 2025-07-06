@@ -39,11 +39,6 @@ class NoteDetailUpdateTitle extends NoteDetailEvent {
   List<Object?> get props => [title];
 }
 
-/// 切换编辑模式事件
-class NoteDetailToggleEditMode extends NoteDetailEvent {
-  const NoteDetailToggleEditMode();
-}
-
 /// 保存笔记事件
 class NoteDetailSaveNote extends NoteDetailEvent {
   const NoteDetailSaveNote();
