@@ -1,6 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:record/data/repository/notes_repository.dart';
+import 'package:record_app/data/repository/notes_repository.dart';
 import 'package:drift/drift.dart';
 
 // 事件

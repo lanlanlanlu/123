@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/data/database/connection/connection.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/data/repository/index.dart';
-import 'package:record/app/routes/app_router.dart';
-import 'package:record/features/home/presentation/bloc/home_bloc.dart';
-import 'package:record/features/home/presentation/bloc/home_event.dart';
-import 'package:record/features/tags/presentation/bloc/tag_list_bloc.dart';
-import 'package:record/features/main_shell/presentation/bloc/main_shell_cubit.dart';
-import 'package:record/data/database/connection/native.dart' show closeDatabase;
+import 'package:record_app/data/database/connection/connection.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/index.dart';
+import 'package:record_app/app/routes/app_router.dart';
+import 'package:record_app/features/home/presentation/bloc/home_bloc.dart';
+import 'package:record_app/features/home/presentation/bloc/home_event.dart';
+import 'package:record_app/features/tags/presentation/bloc/tag_list_bloc.dart';
+import 'package:record_app/features/main_shell/presentation/bloc/main_shell_cubit.dart';
+import 'package:record_app/data/database/connection/native.dart' show closeDatabase;
 
 // 全局单例，避免重复创建
 late final AppDatabase _database;

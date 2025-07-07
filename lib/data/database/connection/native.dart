@@ -4,7 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import 'package:record/data/database/database.dart';
+import 'package:record_app/data/database/database.dart';
 
 // 使用单例模式保存数据库实例
 AppDatabase? _databaseInstance;

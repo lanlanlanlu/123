@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/data/repository/index.dart';
-import 'package:record/features/home/presentation/bloc/home_bloc.dart';
-import 'package:record/features/home/presentation/bloc/home_event.dart';
-import 'package:record/features/home/presentation/bloc/home_state.dart';
-import 'package:record/features/home/presentation/widgets/custom_app_bar.dart';
-import 'package:record/features/home/presentation/widgets/empty_notes_view.dart';
-import 'package:record/features/home/presentation/widgets/note_card.dart';
+import 'package:record_app/data/repository/index.dart';
+import 'package:record_app/features/home/presentation/bloc/home_bloc.dart';
+import 'package:record_app/features/home/presentation/bloc/home_event.dart';
+import 'package:record_app/features/home/presentation/bloc/home_state.dart';
+import 'package:record_app/features/home/presentation/widgets/custom_app_bar.dart';
+import 'package:record_app/features/home/presentation/widgets/empty_notes_view.dart';
+import 'package:record_app/features/home/presentation/widgets/note_card.dart';
 
 /// 首页，显示所有笔记列表
 class HomePage extends StatelessWidget {

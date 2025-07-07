@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:record/data/database/database.dart';
+import 'package:record_app/data/database/database.dart';
 
 /// NoteDetail页面的所有事件基类
 abstract class NoteDetailEvent extends Equatable {

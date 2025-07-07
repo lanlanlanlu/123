@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
-import 'package:record/core/utils/date_extensions.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/features/home/presentation/widgets/note_location.dart';
-import 'package:record/features/home/presentation/widgets/note_tags.dart';
+import 'package:record_app/core/utils/date_extensions.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/features/home/presentation/widgets/note_location.dart';
+import 'package:record_app/features/home/presentation/widgets/note_tags.dart';
 
 /// 笔记卡片组件，用于显示笔记列表中的单个笔记项
 class NoteCard extends StatelessWidget {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:record/features/main_shell/presentation/widgets/note_input_sheet.dart';
+import 'package:record_app/features/main_shell/presentation/widgets/note_input_sheet.dart';
 
 /// 笔记输入覆盖层组件
 class InputSheetOverlay extends StatelessWidget {

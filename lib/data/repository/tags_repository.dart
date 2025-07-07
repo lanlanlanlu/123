@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import 'package:record/data/database/database.dart';
+import 'package:record_app/data/database/database.dart';
 
 /// 标签数据仓库，封装所有与标签相关的数据操作
 class TagsRepository {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/data/repository/index.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/index.dart';
 
 /// 显示笔记的字数统计和标签的组件
 class StatsAndTagsBar extends StatelessWidget {

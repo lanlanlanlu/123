@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/data/repository/index.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/index.dart';
 
 // Events
 abstract class TagDetailEvent extends Equatable {

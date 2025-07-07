@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
-import 'package:record/data/repository/index.dart';
-import 'package:record/features/main_shell/presentation/bloc/note_input_cubit.dart';
-import 'package:record/features/main_shell/presentation/widgets/note_input_toolbar.dart';
+import 'package:record_app/data/repository/index.dart';
+import 'package:record_app/features/main_shell/presentation/bloc/note_input_cubit.dart';
+import 'package:record_app/features/main_shell/presentation/widgets/note_input_toolbar.dart';
 
 /// 笔记输入表单组件
 class NoteInputSheet extends StatefulWidget {

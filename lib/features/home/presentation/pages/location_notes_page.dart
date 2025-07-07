@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/data/repository/index.dart';
-import 'package:record/features/home/presentation/bloc/home_bloc.dart';
-import 'package:record/features/home/presentation/bloc/home_event.dart';
-import 'package:record/features/home/presentation/bloc/home_state.dart';
-import 'package:record/features/home/presentation/widgets/note_card.dart';
-import 'package:record/features/home/presentation/widgets/empty_notes_view.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/index.dart';
+import 'package:record_app/features/home/presentation/bloc/home_bloc.dart';
+import 'package:record_app/features/home/presentation/bloc/home_event.dart';
+import 'package:record_app/features/home/presentation/bloc/home_state.dart';
+import 'package:record_app/features/home/presentation/widgets/note_card.dart';
+import 'package:record_app/features/home/presentation/widgets/empty_notes_view.dart';
 
 /// 特定位置的笔记列表页面
 class LocationNotesPage extends StatelessWidget {

@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/data/database/connection/connection.dart' as connection;
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/database/connection/connection.dart' as connection;
 
 /// 笔记数据仓库，封装所有与笔记相关的数据操作
 class NotesRepository {

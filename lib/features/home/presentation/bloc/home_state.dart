@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:record/data/database/database.dart';
+import 'package:record_app/data/database/database.dart';
 
 /// Home页面的所有状态基类
 abstract class HomeState extends Equatable {

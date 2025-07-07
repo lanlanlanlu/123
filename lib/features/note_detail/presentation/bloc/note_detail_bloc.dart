@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/data/repository/index.dart';
-import 'package:record/features/note_detail/presentation/bloc/note_detail_event.dart';
-import 'package:record/features/note_detail/presentation/bloc/note_detail_state.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/index.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_event.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_state.dart';
 
 class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
   final NotesRepository _notesRepository;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/features/main_shell/presentation/widgets/format_menu_sheet.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/features/main_shell/presentation/widgets/format_menu_sheet.dart';
 
 /// 笔记输入工具栏组件
 class NoteInputToolbar extends StatefulWidget {

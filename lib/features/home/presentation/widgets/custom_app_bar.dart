@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/features/home/presentation/bloc/app_bar_bloc.dart';
+import 'package:record_app/features/home/presentation/bloc/app_bar_bloc.dart';
 
 /// 自定义应用栏
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {

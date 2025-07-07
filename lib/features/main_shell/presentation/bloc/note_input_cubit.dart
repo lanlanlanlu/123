@@ -1,8 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:drift/drift.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/data/repository/index.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/index.dart';
 
 // 笔记输入状态
 enum NoteInputStatus {

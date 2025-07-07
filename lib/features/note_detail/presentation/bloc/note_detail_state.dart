@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:record/data/database/database.dart';
+import 'package:record_app/data/database/database.dart';
 
 /// 笔记编辑模式
 enum NoteEditMode {

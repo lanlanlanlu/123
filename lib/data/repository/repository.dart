@@ -1,6 +1,6 @@
-import 'package:record/data/database/database.dart';
-import 'package:record/data/repository/notes_repository.dart';
-import 'package:record/data/repository/tags_repository.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/notes_repository.dart';
+import 'package:record_app/data/repository/tags_repository.dart';
 
 /// 中央仓库管理类，统一管理所有数据仓库
 class Repository {

@@ -3,10 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
-import 'package:record/core/widgets/image_context_menu.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/features/note_detail/presentation/bloc/note_detail_bloc.dart';
-import 'package:record/features/note_detail/presentation/bloc/note_detail_event.dart';
+import 'package:record_app/core/widgets/image_context_menu.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_bloc.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_event.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 

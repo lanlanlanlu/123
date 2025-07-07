@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/data/repository/index.dart';
-import 'package:record/features/home/presentation/bloc/home_event.dart';
-import 'package:record/features/home/presentation/bloc/home_state.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/index.dart';
+import 'package:record_app/features/home/presentation/bloc/home_event.dart';
+import 'package:record_app/features/home/presentation/bloc/home_state.dart';
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final NotesRepository _notesRepository;

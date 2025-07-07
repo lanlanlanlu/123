@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:record/features/home/presentation/bloc/location_list_bloc.dart';
-import 'package:record/features/home/presentation/pages/location_notes_page.dart';
+import 'package:record_app/features/home/presentation/bloc/location_list_bloc.dart';
+import 'package:record_app/features/home/presentation/pages/location_notes_page.dart';
 
 /// 位置信息列表页面
 class LocationListPage extends StatelessWidget {

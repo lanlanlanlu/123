@@ -2,7 +2,7 @@
 
 import 'package:drift/drift.dart';
 import 'package:drift/wasm.dart';
-import 'package:record/data/database/database.dart';
+import 'package:record_app/data/database/database.dart';
 
 AppDatabase connect() {
   return AppDatabase(DatabaseConnection.delayed(Future(() async {

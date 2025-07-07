@@ -9,9 +9,9 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
-import 'package:record/features/note_detail/presentation/bloc/note_detail_bloc.dart';
-import 'package:record/features/note_detail/presentation/bloc/note_detail_event.dart';
-import 'package:record/features/note_detail/presentation/widgets/stats_and_tags_bar.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_bloc.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_event.dart';
+import 'package:record_app/features/note_detail/presentation/widgets/stats_and_tags_bar.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// 基于Flutter Quill的笔记编辑器组件

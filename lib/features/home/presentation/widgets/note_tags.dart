@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/features/tags/presentation/pages/tag_detail_page.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/features/tags/presentation/pages/tag_detail_page.dart';
 
 /// 笔记标签组件，用于显示单个笔记的所有标签
 class NoteTagsWidget extends StatelessWidget {

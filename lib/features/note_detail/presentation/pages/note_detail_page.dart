@@ -4,26 +4,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:record/data/database/database.dart';
+import 'package:record_app/data/database/database.dart';
 import 'package:drift/drift.dart' as d;
-import 'package:record/core/utils/date_extensions.dart';
+import 'package:record_app/core/utils/date_extensions.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:record/data/repository/index.dart';
-import 'package:record/features/note_detail/presentation/bloc/note_detail_bloc.dart';
-import 'package:record/features/note_detail/presentation/bloc/note_detail_event.dart';
-import 'package:record/features/note_detail/presentation/bloc/note_detail_state.dart'; 
-import 'package:record/features/tags/presentation/pages/tag_detail_page.dart';
-import 'package:record/core/widgets/interactive_text.dart';
+import 'package:record_app/data/repository/index.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_bloc.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_event.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_state.dart'; 
+import 'package:record_app/features/tags/presentation/pages/tag_detail_page.dart';
+import 'package:record_app/core/widgets/interactive_text.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
 // 导入重构后的组件
-import 'package:record/features/note_detail/presentation/widgets/note_image_grid.dart';
-import 'package:record/features/note_detail/presentation/widgets/note_edit_actions_bar.dart';
-import 'package:record/features/note_detail/presentation/widgets/note_utils.dart';
+import 'package:record_app/features/note_detail/presentation/widgets/note_image_grid.dart';
+import 'package:record_app/features/note_detail/presentation/widgets/note_edit_actions_bar.dart';
+import 'package:record_app/features/note_detail/presentation/widgets/note_utils.dart';
 // 导入Quill编辑器组件
-import 'package:record/features/note_detail/presentation/widgets/quill_editor_widget.dart';
+import 'package:record_app/features/note_detail/presentation/widgets/quill_editor_widget.dart';
 
 class NoteDetailPage extends StatelessWidget {
   final Note note;

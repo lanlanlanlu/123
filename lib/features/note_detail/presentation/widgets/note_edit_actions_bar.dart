@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:record/data/database/database.dart';
+import 'package:record_app/data/database/database.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
 

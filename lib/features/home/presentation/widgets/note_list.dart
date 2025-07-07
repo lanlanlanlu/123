@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/features/home/presentation/widgets/note_card.dart';
-import 'package:record/features/home/presentation/widgets/empty_notes_view.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/features/home/presentation/widgets/note_card.dart';
+import 'package:record_app/features/home/presentation/widgets/empty_notes_view.dart';
 
 /// 笔记列表组件，用于显示所有笔记
 class NoteList extends StatelessWidget {

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/features/calendar/presentation/pages/calendar_page.dart';
-import 'package:record/features/home/presentation/pages/home_page.dart';
-import 'package:record/features/main_shell/presentation/bloc/main_shell_cubit.dart';
-import 'package:record/features/settings/presentation/pages/settings_page.dart';
-import 'package:record/features/main_shell/presentation/widgets/bottom_nav_bar.dart';
-import 'package:record/features/main_shell/presentation/widgets/input_sheet_overlay.dart';
+import 'package:record_app/features/calendar/presentation/pages/calendar_page.dart';
+import 'package:record_app/features/home/presentation/pages/home_page.dart';
+import 'package:record_app/features/main_shell/presentation/bloc/main_shell_cubit.dart';
+import 'package:record_app/features/settings/presentation/pages/settings_page.dart';
+import 'package:record_app/features/main_shell/presentation/widgets/bottom_nav_bar.dart';
+import 'package:record_app/features/main_shell/presentation/widgets/input_sheet_overlay.dart';
 
 /// 草稿键值常量
 const String DRAFT_KEY = 'note_draft';

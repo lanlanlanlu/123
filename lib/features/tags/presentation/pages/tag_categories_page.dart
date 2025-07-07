@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:record/data/database/database.dart';
-import 'package:record/data/repository/index.dart';
-import 'package:record/features/tags/presentation/bloc/tag_list_bloc.dart';
-import 'package:record/features/tags/presentation/pages/tag_detail_page.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/index.dart';
+import 'package:record_app/features/tags/presentation/bloc/tag_list_bloc.dart';
+import 'package:record_app/features/tags/presentation/pages/tag_detail_page.dart';
 
 class TagCategoriesPage extends StatelessWidget {
   const TagCategoriesPage({super.key});

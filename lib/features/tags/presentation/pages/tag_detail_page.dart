@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:record/data/repository/index.dart';
-import 'package:record/features/home/presentation/widgets/empty_notes_view.dart';
-import 'package:record/features/home/presentation/widgets/note_card.dart';
-import 'package:record/features/tags/presentation/bloc/tag_detail_bloc.dart';
+import 'package:record_app/data/repository/index.dart';
+import 'package:record_app/features/home/presentation/widgets/empty_notes_view.dart';
+import 'package:record_app/features/home/presentation/widgets/note_card.dart';
+import 'package:record_app/features/tags/presentation/bloc/tag_detail_bloc.dart';
 
 class TagDetailPage extends StatelessWidget {
   final String tagName;
