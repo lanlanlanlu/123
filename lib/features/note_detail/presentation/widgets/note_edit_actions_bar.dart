@@ -27,6 +27,9 @@ class NoteEditActionsBar extends StatefulWidget {
   /// 插入列表回调 - 添加项目符号、数字列表等
   final Function(String marker)? onInsertList;
   
+  /// 开始录音的回调
+  final VoidCallback? onRecordAudio;
+  
   /// QuillController 实例，用于直接控制编辑器
   final QuillController? controller;
 
@@ -40,6 +43,7 @@ class NoteEditActionsBar extends StatefulWidget {
     this.onFormatText,
     this.onInsertList,
     this.controller,
+    this.onRecordAudio,
   });
 
   @override
@@ -106,11 +110,16 @@ class _NoteEditActionsBarState extends State<NoteEditActionsBar> {
               // 右侧空间
               const Spacer(),
               
-              // 保存按钮
+              // 加号按钮 - 替换原来的发送按钮
               IconButton(
-                onPressed: widget.onSave,
-                icon: const Icon(Icons.send),
-                tooltip: '保存',
+                onPressed: () {
+                  setState(() {
+                    _activeSubmenu = _activeSubmenu == 'add' ? null : 'add';
+                  });
+                },
+                icon: const Icon(Icons.add),
+                tooltip: '更多选项',
+                color: _activeSubmenu == 'add' ? Theme.of(context).primaryColor : null,
               )
             ],
           ),
@@ -145,6 +154,8 @@ class _NoteEditActionsBarState extends State<NoteEditActionsBar> {
     switch (_activeSubmenu) {
       case 'image':
         return _buildMediaSubmenu(context);
+      case 'add':
+        return _buildAddSubmenu(context);
       default:
         return const SizedBox.shrink();
     }
@@ -222,6 +233,78 @@ class _NoteEditActionsBarState extends State<NoteEditActionsBar> {
             onTap: item.onTap,
             color: Colors.deepPurple,
             backgroundColor: Colors.deepPurple.withOpacity(0.1),
+          );
+        },
+      ),
+    );
+  }
+  
+  // 构建添加菜单(录音、保存等)
+  Widget _buildAddSubmenu(BuildContext context) {
+    final items = [
+      (
+        icon: Icons.mic,
+        label: '录音',
+        onTap: () {
+          if (widget.onRecordAudio != null) {
+            widget.onRecordAudio!();
+          }
+          _closeSubmenu();
+        },
+      ),
+      (
+        icon: Icons.save,
+        label: '保存',
+        onTap: () {
+          widget.onSave();
+          _closeSubmenu();
+        },
+      ),
+      (
+        icon: Icons.table_chart,
+        label: '表格',
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('表格功能即将上线')),
+          );
+          _closeSubmenu();
+        },
+      ),
+      (
+        icon: Icons.music_note,
+        label: '音频',
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('插入音频功能即将上线')),
+          );
+          _closeSubmenu();
+        },
+      ),
+    ];
+
+    return Container(
+      key: const ValueKey<String>('add_submenu'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+      color: Theme.of(context).canvasColor,
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          childAspectRatio: 0.8,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 8,
+        ),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return _buildSubmenuOption(
+            icon: item.icon,
+            label: item.label,
+            onTap: item.onTap,
+            color: Colors.orange,
+            backgroundColor: Colors.orange.withOpacity(0.1),
           );
         },
       ),

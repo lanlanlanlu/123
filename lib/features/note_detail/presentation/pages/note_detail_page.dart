@@ -210,6 +210,14 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     }
   }
 
+  // 处理录音
+  void _handleRecordAudio() {
+    final quillEditorState = _quillEditorKey.currentState;
+    if (quillEditorState != null) {
+      (quillEditorState as dynamic).insertAudioRecording();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<NoteDetailBloc, NoteDetailState>(
@@ -238,81 +246,31 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           return WillPopScope(
             // 拦截返回事件，检查是否有未保存的更改或处于编辑模式
             onWillPop: () async {
-              // 如果正在编辑模式，先退出编辑模式
-              if (_isEditing) {
-                setState(() {
-                  _isEditing = false;
-                });
-                
-                // 如果有未保存的更改，提示用户是否保存
-                if (state.hasUnsavedChanges) {
-                  final shouldSave = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('有未保存的更改'),
-                      content: const Text('是否保存更改？'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('不保存'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('保存'),
-                        ),
-                      ],
-                    ),
-                  );
-                  
-                  if (shouldSave == true) {
-                    await _saveNote();
-                  }
-                }
-                return false; // 不退出页面，只退出编辑模式
-              } else if (state.hasUnsavedChanges) {
-                // 如果有未保存的更改，提示用户是否保存
-                final shouldSave = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('有未保存的更改'),
-                    content: const Text('是否保存更改？'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('不保存'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('保存'),
-                      ),
-                    ],
-                  ),
-                );
-                
-                if (shouldSave == true) {
-                  await _saveNote();
-                }
+              // 任何状态下如有未保存的更改，自动保存
+              if (state.hasUnsavedChanges) {
+                await _saveNote();
               }
-              return true;
+              return true; // 允许退出页面
             },
             child: Scaffold(
               key: _scaffoldKey,
               appBar: AppBar(
+                // 返回按钮
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () async {
+                    // 如果有未保存内容，自动保存
+                    if (state.hasUnsavedChanges) {
+                      await _saveNote();
+                    }
+                    // 直接返回
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
                 title: Text(state.note.title.isEmpty ? '新建笔记' : state.note.title),
                 actions: [
-                  // 在编辑模式显示完成按钮，否则不显示按钮
-                  if (_isEditing)
-                    TextButton(
-                      onPressed: () {
-                        // 保存笔记并退出编辑模式
-                        _saveNote();
-                        setState(() {
-                          _isEditing = false;
-                        });
-                      },
-                      child: const Text('完成'),
-                    ),
-                  
                   // 撤销按钮 - 仅在编辑模式显示
                   if (_isEditing)
                     IconButton(
@@ -329,53 +287,68 @@ class _NoteDetailViewState extends State<NoteDetailView> {
                       tooltip: '重做',
                     ),
                   
-                  // 菜单选项
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        _showDeleteConfirmation(context);
-                      } else if (value == 'share') {
-                        _shareNoteContent(context, state.displayContent);
-                      } else if (value == 'thumbnail') {
-                        context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode());
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'thumbnail',
-                        child: Row(
-                          children: [
-                            Icon(
-                              state.thumbnailMode ? Icons.image : Icons.image_outlined,
-                              color: Theme.of(context).iconTheme.color,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(state.thumbnailMode ? '显示图片' : '隐藏图片'),
-                          ],
+                  // 非编辑模式下显示菜单选项
+                  if (!_isEditing)
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'delete') {
+                          _showDeleteConfirmation(context);
+                        } else if (value == 'share') {
+                          _shareNoteContent(context, state.displayContent);
+                        } else if (value == 'thumbnail') {
+                          context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode());
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'thumbnail',
+                          child: Row(
+                            children: [
+                              Icon(
+                                state.thumbnailMode ? Icons.image : Icons.image_outlined,
+                                color: Theme.of(context).iconTheme.color,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(state.thumbnailMode ? '显示图片' : '隐藏图片'),
+                            ],
+                          ),
                         ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'share',
-                        child: Row(
-                          children: [
-                            Icon(Icons.share),
-                            SizedBox(width: 8),
-                            Text('分享笔记'),
-                          ],
+                        const PopupMenuItem(
+                          value: 'share',
+                          child: Row(
+                            children: [
+                              Icon(Icons.share),
+                              SizedBox(width: 8),
+                              Text('分享笔记'),
+                            ],
+                          ),
                         ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('删除', style: TextStyle(color: Colors.red)),
-                          ],
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('删除', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  
+                  // 编辑模式下显示完成按钮（图标），放在最右侧
+                  if (_isEditing)
+                    IconButton(
+                      onPressed: () {
+                        // 保存笔记并退出编辑模式
+                        _saveNote();
+                        setState(() {
+                          _isEditing = false;
+                        });
+                      },
+                      icon: const Icon(Icons.check),
+                      tooltip: '完成',
+                    ),
                 ],
               ),
               body: Column(
@@ -414,6 +387,7 @@ class _NoteDetailViewState extends State<NoteDetailView> {
                         _insertTextAtCursor('$marker ');
                       },
                       controller: QuillEditorWidget.getController(_quillEditorKey),
+                      onRecordAudio: _handleRecordAudio,
                     ),
                 ],
               ),

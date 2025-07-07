@@ -13,6 +13,8 @@ import 'package:record_app/features/note_detail/presentation/bloc/note_detail_bl
 import 'package:record_app/features/note_detail/presentation/bloc/note_detail_event.dart';
 import 'package:record_app/features/note_detail/presentation/widgets/stats_and_tags_bar.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:record_app/features/note_detail/presentation/widgets/audio_recording_embed.dart';
+import 'package:flutter/rendering.dart' show HitTestResult; // for hit testing
 
 /// 基于Flutter Quill的笔记编辑器组件
 class QuillEditorWidget extends StatefulWidget {
@@ -108,7 +110,7 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
       _controller = QuillController.basic();
     }
     
-    // 监听内容变化，但不使用自动恢复光标位置的逻辑
+    // 监听内容变化
     _controller.addListener(_onTextChanged);
     
     // 确保编辑器在初始化后获得焦点，并将光标移到末尾
@@ -248,6 +250,49 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
     }
   }
 
+  // 插入音频录音 - 公开方法，可以从外部调用
+  Future<void> insertAudioRecording() async {
+    // 请求麦克风权限
+    final status = await Permission.microphone.request();
+
+    if (status.isGranted) {
+      try {
+        // 直接在当前光标位置插入一个新的录音嵌入块（处于录音状态）
+        final audioEmbed = AudioRecordingBlockEmbed.createNew();
+        
+        // 在当前光标位置插入音频嵌入
+        final index = _controller.selection.baseOffset;
+        final isSelectionValid = index >= 0 && index < _controller.document.length;
+        final offset = isSelectionValid ? index : _controller.document.length;
+        
+        // 创建一个全局变量，用于跟踪当前的录音嵌入块
+        _controller.document.insert(offset, audioEmbed);
+        // 始终在录音嵌入后插入换行符，确保立即渲染
+        _controller.document.insert(offset + 1, '\n');
+        // 移动光标到嵌入后的下一行
+        _controller.updateSelection(
+          TextSelection.collapsed(offset: offset + 2),
+          ChangeSource.local,
+        );
+      } catch (e) {
+        debugPrint('插入音频嵌入失败: $e');
+        // 回退到添加到末尾
+        try {
+          _controller.document.insert(_controller.document.length, AudioRecordingBlockEmbed.createNew());
+          _controller.document.insert(_controller.document.length, '\n');
+        } catch (e2) {
+          debugPrint('回退插入音频嵌入也失败: $e2');
+        }
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('需要麦克风权限才能录音')),
+        );
+      }
+    }
+  }
+  
   // 复制图片并插入到编辑器
   Future<void> _copyImageAndInsertToEditor(XFile imageFile) async {
     final documents = await getApplicationDocumentsDirectory();
@@ -334,6 +379,10 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
             onPressed: () => Navigator.pop(context, 'video'),
             child: const Text('视频'),
           ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'audio'),
+            child: const Text('录音'),
+          ),
         ],
       ),
     );
@@ -341,6 +390,8 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
       await insertImage();
     } else if (result == 'video') {
       await insertVideo();
+    } else if (result == 'audio') {
+      await insertAudioRecording();
     }
   }
 
@@ -426,7 +477,11 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
                     autoFocus: widget.isEditing,
                     expands: true,
                     padding: EdgeInsets.zero,
-                    embedBuilders: [CustomImageEmbedBuilder(), CustomVideoEmbedBuilder()],
+                    embedBuilders: [
+                      CustomImageEmbedBuilder(), 
+                      CustomVideoEmbedBuilder(),
+                      AudioRecordingEmbedBuilder(),
+                    ],
                     detectWordBoundary: true,
                     enableSelectionToolbar: widget.isEditing,
                     showCursor: widget.isEditing,
@@ -436,7 +491,11 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
                   Positioned.fill(
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onTap: widget.onTapToEdit,
+                      onTapDown: (details) {
+                        if (!_isEmbedAtPosition(details.globalPosition)) {
+                          widget.onTapToEdit!();
+                        }
+                      },
                     ),
                   ),
               ],
@@ -524,6 +583,76 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
         ChangeSource.local
       );
     }
+  }
+
+  // 判断点击位置是否位于图片/视频/录音等自定义组件上，而非纯文本
+  bool _isEmbedAtPosition(Offset globalPosition) {
+    final result = HitTestResult();
+    WidgetsBinding.instance.hitTest(result, globalPosition);
+
+    for (final entry in result.path) {
+      final target = entry.target;
+      final String type = target.runtimeType.toString();
+      // 根据常见的渲染对象类型粗略判断：包含图片、视频、录音等关键词时视为embed
+      if (type.contains('Image') ||
+          type.contains('Video') ||
+          type.contains('Audio') ||
+          type.contains('LinearProgress') ||
+          type.contains('Icon') && type.contains('play')
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+/// 录音叠加组件 - 用于显示录音界面
+class _AudioRecordingOverlay extends StatelessWidget {
+  final Function(String path, String duration, String timestamp) onRecordingComplete;
+  
+  const _AudioRecordingOverlay({
+    required this.onRecordingComplete,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      height: 200,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                '录制语音',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: AudioRecordingWidget(
+              onRecordingComplete: (path, duration, timestamp) {
+                // 通知父组件录音已完成
+                onRecordingComplete(path, duration, timestamp);
+                // 关闭底部面板
+                Navigator.pop(context);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
