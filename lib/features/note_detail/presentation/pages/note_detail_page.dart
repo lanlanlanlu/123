@@ -55,6 +55,9 @@ class _NoteDetailViewState extends State<NoteDetailView> {
   late TextEditingController _titleController;
   final FocusNode _focusNode = FocusNode();
   
+  // 添加编辑状态控制
+  bool _isEditing = false;
+  
   // 修改GlobalKey类型为通用State类型
   final GlobalKey<State<QuillEditorWidget>> _quillEditorKey = GlobalKey<State<QuillEditorWidget>>();
 
@@ -77,6 +80,9 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     _textController = TextEditingController(text: widget.initialNote.content);
     _titleController = TextEditingController(text: widget.initialNote.title);
     _lastText = widget.initialNote.content; // 初始文本
+    
+    // 默认为非编辑模式
+    _isEditing = false;
     
     // 添加文本控制器监听
     _textController.addListener(_onTextChanged);
@@ -230,9 +236,40 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           );
         } else if (state is NoteDetailLoaded) {
           return WillPopScope(
-            // 拦截返回事件，检查是否有未保存的更改
+            // 拦截返回事件，检查是否有未保存的更改或处于编辑模式
             onWillPop: () async {
-              if (state.hasUnsavedChanges) {
+              // 如果正在编辑模式，先退出编辑模式
+              if (_isEditing) {
+                setState(() {
+                  _isEditing = false;
+                });
+                
+                // 如果有未保存的更改，提示用户是否保存
+                if (state.hasUnsavedChanges) {
+                  final shouldSave = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('有未保存的更改'),
+                      content: const Text('是否保存更改？'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('不保存'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: const Text('保存'),
+                        ),
+                      ],
+                    ),
+                  );
+                  
+                  if (shouldSave == true) {
+                    await _saveNote();
+                  }
+                }
+                return false; // 不退出页面，只退出编辑模式
+              } else if (state.hasUnsavedChanges) {
                 // 如果有未保存的更改，提示用户是否保存
                 final shouldSave = await showDialog<bool>(
                   context: context,
@@ -263,26 +300,34 @@ class _NoteDetailViewState extends State<NoteDetailView> {
               appBar: AppBar(
                 title: Text(state.note.title.isEmpty ? '新建笔记' : state.note.title),
                 actions: [
-                  // 显示保存按钮
-                  IconButton(
-                    icon: const Icon(Icons.save),
-                    onPressed: _saveNote,
-                    tooltip: '保存笔记',
-                  ),
+                  // 在编辑模式显示完成按钮，否则不显示按钮
+                  if (_isEditing)
+                    TextButton(
+                      onPressed: () {
+                        // 保存笔记并退出编辑模式
+                        _saveNote();
+                        setState(() {
+                          _isEditing = false;
+                        });
+                      },
+                      child: const Text('完成'),
+                    ),
                   
-                  // 撤销按钮
-                  IconButton(
-                    onPressed: _undoHistory.isEmpty ? null : _undo,
-                    icon: const Icon(Icons.undo),
-                    tooltip: '撤销',
-                  ),
+                  // 撤销按钮 - 仅在编辑模式显示
+                  if (_isEditing)
+                    IconButton(
+                      onPressed: _undoHistory.isEmpty ? null : _undo,
+                      icon: const Icon(Icons.undo),
+                      tooltip: '撤销',
+                    ),
                   
-                  // 重做按钮
-                  IconButton(
-                    onPressed: _redoHistory.isEmpty ? null : _redo,
-                    icon: const Icon(Icons.redo),
-                    tooltip: '重做',
-                  ),
+                  // 重做按钮 - 仅在编辑模式显示
+                  if (_isEditing)
+                    IconButton(
+                      onPressed: _redoHistory.isEmpty ? null : _redo,
+                      icon: const Icon(Icons.redo),
+                      tooltip: '重做',
+                    ),
                   
                   // 菜单选项
                   PopupMenuButton<String>(
@@ -340,33 +385,36 @@ class _NoteDetailViewState extends State<NoteDetailView> {
                     child: SafeArea(
                       // 不为底部添加安全区域，工具栏会自己处理
                       bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
-                        child: _buildContent(state),
-                      ),
+                      child: _buildContent(state),
                     ),
                   ),
                   
-                  // 显示底部工具栏
-                  NoteEditActionsBar(
-                    onInsertText: _insertTextAtCursor,
-                    onPickImage: () {
-                      final quillEditorState = _quillEditorKey.currentState;
-                      if (quillEditorState != null) {
-                        // 使用dynamic类型访问私有成员
-                        (quillEditorState as dynamic).insertImage();
-                      }
-                    },
-                    onTakePhoto: () {}, // 暂不实现拍照功能
-                    onSave: _saveNote,
-                    onFormatText: (prefix, suffix) {
-                      _insertFormattedTextAtCursor(prefix, suffix);
-                    },
-                    onInsertList: (marker) {
-                      _insertTextAtCursor('$marker ');
-                    },
-                    controller: QuillEditorWidget.getController(_quillEditorKey),
-                  ),
+                  // 显示底部工具栏 - 仅在编辑模式下显示
+                  if (_isEditing)
+                    NoteEditActionsBar(
+                      onInsertText: _insertTextAtCursor,
+                      onPickImage: () {
+                        final quillEditorState = _quillEditorKey.currentState;
+                        if (quillEditorState != null) {
+                          (quillEditorState as dynamic).insertImage();
+                        }
+                      },
+                      onPickVideo: () {
+                        final quillEditorState = _quillEditorKey.currentState;
+                        if (quillEditorState != null) {
+                          (quillEditorState as dynamic).insertVideo();
+                        }
+                      },
+                      onTakePhoto: () {}, // 暂不实现拍照功能
+                      onSave: _saveNote,
+                      onFormatText: (prefix, suffix) {
+                        _insertFormattedTextAtCursor(prefix, suffix);
+                      },
+                      onInsertList: (marker) {
+                        _insertTextAtCursor('$marker ');
+                      },
+                      controller: QuillEditorWidget.getController(_quillEditorKey),
+                    ),
                 ],
               ),
               
@@ -422,6 +470,12 @@ class _NoteDetailViewState extends State<NoteDetailView> {
       onDeleteImage: _handleDeleteImage,
       onTagRemoved: _handleTagRemoved,
       thumbnailMode: state.thumbnailMode,
+      isEditing: _isEditing, // 传递编辑状态
+      onTapToEdit: () {
+        setState(() {
+          _isEditing = true;
+        });
+      },
     );
   }
 

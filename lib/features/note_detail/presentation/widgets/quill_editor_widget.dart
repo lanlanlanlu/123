@@ -8,6 +8,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 import 'package:record/features/note_detail/presentation/bloc/note_detail_bloc.dart';
 import 'package:record/features/note_detail/presentation/bloc/note_detail_event.dart';
 import 'package:record/features/note_detail/presentation/widgets/stats_and_tags_bar.dart';
@@ -42,6 +43,12 @@ class QuillEditorWidget extends StatefulWidget {
   /// 是否启用小图模式
   final bool thumbnailMode;
   
+  /// 是否处于编辑模式
+  final bool isEditing;
+  
+  /// 点击进入编辑模式的回调
+  final VoidCallback? onTapToEdit;
+  
   /// 获取编辑器控制器
   static QuillController? getController(GlobalKey<State<QuillEditorWidget>> key) {
     final state = key.currentState;
@@ -63,6 +70,8 @@ class QuillEditorWidget extends StatefulWidget {
     this.onDeleteImage,
     this.onTagRemoved,
     this.thumbnailMode = false,
+    this.isEditing = true,
+    this.onTapToEdit,
   });
 
   @override
@@ -221,6 +230,24 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
     }
   }
 
+  // 插入视频 - 公开方法，可以从外部调用
+  Future<void> insertVideo() async {
+    // 请求相册/视频权限（与图片相同）
+    final status = await Permission.photos.request();
+    if (status.isGranted) {
+      final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
+      if (video != null) {
+        await _copyVideoAndInsertToEditor(video);
+      }
+    } else if (status.isDenied || status.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('需要相册权限才能选择视频')),
+        );
+      }
+    }
+  }
+
   // 复制图片并插入到编辑器
   Future<void> _copyImageAndInsertToEditor(XFile imageFile) async {
     final documents = await getApplicationDocumentsDirectory();
@@ -264,6 +291,59 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
     }
   }
 
+  // 复制视频并插入到编辑器
+  Future<void> _copyVideoAndInsertToEditor(XFile videoFile) async {
+    final documents = await getApplicationDocumentsDirectory();
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(videoFile.path)}';
+    final String newPath = '${documents.path}/$fileName';
+    await videoFile.saveTo(newPath);
+
+    try {
+      final index = _controller.selection.baseOffset;
+      final isSelectionValid = index >= 0 && index < _controller.document.length;
+      final offset = isSelectionValid ? index : _controller.document.length;
+      _controller.document.insert(offset, BlockEmbed.video(newPath));
+      if (offset < _controller.document.length - 1 &&
+          _controller.document.getPlainText(offset + 1, offset + 2) != '\n') {
+        _controller.document.insert(offset + 1, '\n');
+      }
+    } catch (e) {
+      debugPrint('插入视频失败: $e');
+      try {
+        _controller.document.insert(_controller.document.length, BlockEmbed.video(newPath));
+        _controller.document.insert(_controller.document.length, '\n');
+      } catch (e2) {
+        debugPrint('回退插入视频也失败: $e2');
+      }
+    }
+  }
+
+  // 统一选择媒体（图片或视频）
+  Future<void> insertMedia() async {
+    if (!mounted) return;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('选择要插入的媒体'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'image'),
+            child: const Text('图片'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'video'),
+            child: const Text('视频'),
+          ),
+        ],
+      ),
+    );
+    if (result == 'image') {
+      await insertImage();
+    } else if (result == 'video') {
+      await insertVideo();
+    }
+  }
+
   // 用于防抖处理的计时器
   Timer? _debounceTimer;
   
@@ -277,69 +357,93 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 标题输入框
-        TextField(
-          controller: widget.titleController,
-          decoration: const InputDecoration(
-            hintText: '标题',
-            hintStyle: TextStyle(color: Colors.grey),
-            border: InputBorder.none,
-            contentPadding: EdgeInsets.zero,
-          ),
-          style: const TextStyle(
-            fontSize: 20, 
-            fontWeight: FontWeight.bold,
-            height: 1.5,
-            color: Colors.black87,
-          ),
-          onChanged: (value) {
-            // 使用防抖处理标题更新，避免频繁触发
-            _debounce(() {
-              widget.onTitleChanged(value);
-            });
-          },
-        ),
-        
-        // 字数统计和标签显示栏
-        Padding(
-          padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-          child: StatsAndTagsBar(
-            noteId: widget.noteId,
-            content: _controller.document.toPlainText(),
-            isEditing: true,
-            onTagRemoved: widget.onTagRemoved,
-          ),
-        ),
-        
-        // 编辑器区域 - 移除了内置工具栏，直接显示编辑器
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.grey.shade200),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: QuillEditor.basic(
-              controller: _controller,
-              focusNode: _editorFocusNode,
-              scrollController: _scrollController,
-              config: QuillEditorConfig(
-                placeholder: '开始输入...',
-                scrollable: true,
-                autoFocus: true,
-                expands: true,
-                padding: const EdgeInsets.all(8.0),
-                embedBuilders: [CustomImageEmbedBuilder()],
-                detectWordBoundary: true,
-                enableSelectionToolbar: true,
-              ),
+    // 设置编辑器的只读状态
+    _controller.readOnly = !widget.isEditing;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标题输入框 - 在编辑模式下可以编辑，浏览模式下只显示
+          widget.isEditing 
+              ? TextField(
+                  controller: widget.titleController,
+                  decoration: const InputDecoration(
+                    hintText: '标题',
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  style: const TextStyle(
+                    fontSize: 20, 
+                    fontWeight: FontWeight.bold,
+                    height: 1.5,
+                    color: Colors.black87,
+                  ),
+                  onChanged: (value) {
+                    // 使用防抖处理标题更新，避免频繁触发
+                    _debounce(() {
+                      widget.onTitleChanged(value);
+                    });
+                  },
+                )
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Text(
+                    widget.titleController.text.isEmpty ? '无标题' : widget.titleController.text,
+                    style: const TextStyle(
+                      fontSize: 20, 
+                      fontWeight: FontWeight.bold,
+                      height: 1.5,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+          
+          // 字数统计和标签显示栏
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+            child: StatsAndTagsBar(
+              noteId: widget.noteId,
+              content: _controller.document.toPlainText(),
+              isEditing: widget.isEditing,
+              onTagRemoved: widget.isEditing ? widget.onTagRemoved : null,
             ),
           ),
-        ),
-      ],
+          
+          // 编辑器区域 - 根据模式切换readOnly状态
+          Expanded(
+            child: Stack(
+              children: [
+                QuillEditor.basic(
+                  controller: _controller,
+                  focusNode: _editorFocusNode,
+                  scrollController: _scrollController,
+                  config: QuillEditorConfig(
+                    placeholder: widget.isEditing ? '开始输入...' : '',
+                    scrollable: true,
+                    autoFocus: widget.isEditing,
+                    expands: true,
+                    padding: EdgeInsets.zero,
+                    embedBuilders: [CustomImageEmbedBuilder(), CustomVideoEmbedBuilder()],
+                    detectWordBoundary: true,
+                    enableSelectionToolbar: widget.isEditing,
+                    showCursor: widget.isEditing,
+                  ),
+                ),
+                if (!widget.isEditing && widget.onTapToEdit != null)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: widget.onTapToEdit,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
   
@@ -451,6 +555,84 @@ class CustomImageEmbedBuilder extends EmbedBuilder {
           },
         ),
       ),
+    );
+  }
+}
+
+/// 自定义视频嵌入构建器
+class CustomVideoEmbedBuilder extends EmbedBuilder {
+  @override
+  String get key => BlockEmbed.videoType;
+
+  @override
+  Widget build(BuildContext context, EmbedContext embedContext) {
+    final videoPath = embedContext.node.value.data;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: _VideoPlayerWidget(videoPath: videoPath),
+    );
+  }
+}
+
+class _VideoPlayerWidget extends StatefulWidget {
+  final String videoPath;
+  const _VideoPlayerWidget({required this.videoPath});
+
+  @override
+  State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+}
+
+class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
+  late VideoPlayerController _controller;
+  Future<void>? _initFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.videoPath));
+    _initFuture = _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _initFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SizedBox(
+            width: 200,
+            height: 120,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return AspectRatio(
+          aspectRatio: _controller.value.aspectRatio,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              VideoPlayer(_controller),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                  });
+                },
+                child: Icon(
+                  _controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
+                  size: 48,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 } 
