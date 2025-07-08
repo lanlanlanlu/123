@@ -28,3 +28,7 @@ class CalendarMonthChanged extends CalendarEvent {
   @override
   List<Object?> get props => [focusedMonth];
 }
+
+class CalendarGoToToday extends CalendarEvent {
+  const CalendarGoToToday();
+}

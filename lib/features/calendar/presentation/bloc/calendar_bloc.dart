@@ -15,6 +15,7 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
     on<CalendarLoadNotes>(_onLoadNotes);
     on<CalendarDateSelected>(_onDateSelected);
     on<CalendarMonthChanged>(_onMonthChanged);
+    on<CalendarGoToToday>(_onGoToToday);
   }
 
   Future<void> _onLoadNotes(
@@ -84,5 +85,25 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
     Emitter<CalendarState> emit,
   ) async {
     emit(state.copyWith(focusedDate: event.focusedMonth));
+  }
+
+  Future<void> _onGoToToday(
+    CalendarGoToToday event,
+    Emitter<CalendarState> emit,
+  ) async {
+    final today = DateTime.now();
+    final todayKey = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    );
+
+    final notesForToday = state.notesByDate[todayKey] ?? [];
+
+    emit(state.copyWith(
+      selectedDate: today,
+      focusedDate: today,
+      selectedDateNotes: notesForToday,
+    ));
   }
 }

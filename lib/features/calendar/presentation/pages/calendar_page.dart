@@ -1,13 +1,13 @@
+// lib/features/calendar/presentation/pages/calendar_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:table_calendar/table_calendar.dart';
-import 'package:intl/intl.dart';
 import '../../../../data/repository/repository.dart';
-import '../../../home/presentation/widgets/note_list.dart';
+import '../widgets/calendar_widget.dart';
+import '../widgets/calendar_notes_list.dart';
 import '../bloc/calendar_bloc.dart';
 import '../bloc/calendar_event.dart';
 import '../bloc/calendar_state.dart';
-import '../../../../core/utils/date_format_helper.dart';
 
 class CalendarPage extends StatelessWidget {
   const CalendarPage({super.key});
@@ -28,190 +28,115 @@ class CalendarView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: BlocBuilder<CalendarBloc, CalendarState>(
-          builder: (context, state) {
-            return Column(
-              children: [
-                _buildHeader(context, state),
-                _buildCalendar(context, state),
-                const Divider(height: 1),
-                Expanded(
-                  child: _buildNotesList(context, state),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
+    return BlocBuilder<CalendarBloc, CalendarState>(
+      builder: (context, state) {
+        final selectedDate = state.selectedDate;
+        final now = DateTime.now();
+        final weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        final weekdayText = weekdays[selectedDate.weekday - 1];
 
-  Widget _buildHeader(BuildContext context, CalendarState state) {
-    final dateFormat = DateFormatHelper.getMonthDayFormat(context);
-    final weekdayFormat = DateFormatHelper.getWeekdayFormat(context);
-    final yearFormat = DateFormatHelper.getYearFormat(context);
-
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          // 【修改】使用标准 AppBar，并将所有自定义内容放入 title
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            titleSpacing: 16.0,
+            title: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // 左侧日期组合
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
-                      dateFormat.format(state.selectedDate),
-                      style: const TextStyle(
-                        fontSize: 32,
+                      '${selectedDate.month}月${selectedDate.day}日',
+                      style: Theme.of(context).appBarTheme.titleTextStyle?.copyWith(
+                        fontSize: 30,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      yearFormat.format(state.selectedDate),
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.normal,
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${selectedDate.year}',
+                            style: TextStyle(
+                              color: Theme.of(context).appBarTheme.foregroundColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                          Text(
+                            weekdayText,
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 14,
+                              fontWeight: FontWeight.normal,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                Text(
-                  weekdayFormat.format(state.selectedDate),
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                const Spacer(),
+                // 右侧“今天”按钮
+                _TodayButton(today: now),
               ],
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.today),
-            iconSize: 28,
+          body: Column(
+            children: [
+              CalendarWidget(state: state),
+              Expanded(
+                child: CalendarNotesList(state: state),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
+}
 
-  Widget _buildCalendar(BuildContext context, CalendarState state) {
+// “今天”按钮的内部实现，从旧的 header 文件中移入
+class _TodayButton extends StatelessWidget {
+  final DateTime today;
+
+  const _TodayButton({required this.today});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: TableCalendar<String>(
-        firstDay: DateTime.utc(2020, 1, 1),
-        lastDay: DateTime.utc(2030, 12, 31),
-        focusedDay: state.focusedDate,
-        selectedDayPredicate: (day) {
-          return isSameDay(state.selectedDate, day);
-        },
-        calendarFormat: CalendarFormat.month,
-        startingDayOfWeek: StartingDayOfWeek.monday,
-        headerStyle: const HeaderStyle(
-          formatButtonVisible: false,
-          titleCentered: true,
-          titleTextStyle: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-          leftChevronIcon: Icon(Icons.chevron_left),
-          rightChevronIcon: Icon(Icons.chevron_right),
-        ),
-        daysOfWeekStyle: DaysOfWeekStyle(
-          weekdayStyle: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
-          weekendStyle: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
-        ),
-        calendarStyle: CalendarStyle(
-          outsideDaysVisible: true,
-          weekendTextStyle: const TextStyle(color: Colors.black87),
-          holidayTextStyle: const TextStyle(color: Colors.black87),
-          selectedDecoration: BoxDecoration(
-            color: Theme.of(context).primaryColor.withOpacity(0.8),
-            shape: BoxShape.circle,
-          ),
-          todayDecoration: BoxDecoration(
-            color: Colors.grey[300],
-            shape: BoxShape.circle,
-          ),
-          markerDecoration: const BoxDecoration(
-            color: Colors.blue,
-            shape: BoxShape.circle,
-          ),
-          markersMaxCount: 3,
-          canMarkersOverflow: false,
-        ),
-        eventLoader: (day) {
-          final dateKey = DateTime(day.year, day.month, day.day);
-          final notes = state.notesByDate[dateKey] ?? [];
-          return List.generate(notes.length, (index) => '');
-        },
-        onDaySelected: (selectedDay, focusedDay) {
-          context.read<CalendarBloc>().add(CalendarDateSelected(selectedDay));
-        },
-        onPageChanged: (focusedDay) {
-          context.read<CalendarBloc>().add(CalendarMonthChanged(focusedDay));
-        },
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[400]!, width: 1),
+        borderRadius: BorderRadius.circular(6),
       ),
-    );
-  }
-
-  Widget _buildNotesList(BuildContext context, CalendarState state) {
-    if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (state.error != null) {
-      return Center(
-        child: Text(
-          '加载失败: ${state.error}',
-          style: const TextStyle(color: Colors.red),
-        ),
-      );
-    }
-
-    if (state.selectedDateNotes.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 80,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'NoThing ~',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: () {
+            context.read<CalendarBloc>().add(const CalendarGoToToday());
+          },
+          child: Center(
+            child: Text(
+              '${today.day}',
               style: TextStyle(
-                fontSize: 24,
-                color: Colors.grey,
-                fontWeight: FontWeight.w300,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).appBarTheme.foregroundColor,
               ),
             ),
-          ],
+          ),
         ),
-      );
-    }
-
-    return NoteList(
-      notes: state.selectedDateNotes,
-      onNoteTogglePin: (note) {
-        // TODO: 实现置顶功能
-      },
-      onNoteDelete: (note) {
-        // TODO: 实现删除功能
-      },
+      ),
     );
   }
 }
