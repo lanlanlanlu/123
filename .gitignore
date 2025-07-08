@@ -50,3 +50,6 @@ app.*.map.json
 
 CLAUDE.local.md
 CLAUDE.md
+
+*.jpg
+*.png

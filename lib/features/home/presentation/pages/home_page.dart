@@ -36,82 +36,39 @@ class HomeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 【修改】将 AppBarBloc 的提供者放在这里，管理 AppBar 的事件
-    return BlocProvider(
-      create: (context) => AppBarBloc(),
-      child: Scaffold(
-        // 【修改】使用标准的 AppBar，不再使用 CustomAppBar
-        appBar: AppBar(
-          // 使用在 main.dart 中定义的全局主题
-          automaticallyImplyLeading: false, // 不显示返回按钮
-          titleSpacing: 16.0,
-          title: BlocBuilder<AppBarBloc, AppBarState>(
-            builder: (context, state) {
-              return Row(
-                children: [
-                  // 标题
-                  Text(
-                    '笔记',
-                    // 直接使用 AppBarTheme 的样式，保证统一
-                    style: Theme.of(context).appBarTheme.titleTextStyle,
-                  ),
-                  const Spacer(),
-                  // 右侧图标按钮
-                  IconButton(
-                    icon: const Icon(Icons.location_on_outlined),
-                    onPressed: () => context.read<AppBarBloc>().add(AppBarLocationPressed(context)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.tag),
-                    onPressed: () => context.read<AppBarBloc>().add(AppBarTagPressed(context)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: () => context.read<AppBarBloc>().add(AppBarSearchPressed()),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.menu),
-                    onPressed: () => context.read<AppBarBloc>().add(AppBarMenuPressed()),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-        body: BlocConsumer<HomeBloc, HomeState>(
-          listener: (context, state) {
-            if (state is HomeOperationSuccess) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.message)),
-              );
-            } else if (state is HomeLoadFailure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.message)),
-              );
-            }
-          },
-          builder: (context, state) {
-            if (state is HomeLoading) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (state is HomeLoadSuccess) {
-              if (state.notes.isEmpty) {
-                return const EmptyNotesView();
-              }
-              return ListView.builder(
-                itemCount: state.notes.length,
-                itemBuilder: (context, index) => NoteCard(
-                  note: state.notes[index],
-                  onDelete: (noteId) => context.read<HomeBloc>().add(HomeNoteDeleted(noteId)),
-                  onRestore: (noteId) => context.read<HomeBloc>().add(HomeNoteRestored(noteId)),
-                ),
-              );
-            } else if (state is HomeLoadFailure) {
-              return Center(child: Text('加载失败: ${state.message}'));
-            }
-            return const Center(child: CircularProgressIndicator());
-          },
-        ),
-      ),
+    // 【修改】移除了 Scaffold，只返回 body 内容
+    return BlocConsumer<HomeBloc, HomeState>(
+      listener: (context, state) {
+        if (state is HomeOperationSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        } else if (state is HomeLoadFailure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is HomeLoading) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is HomeLoadSuccess) {
+          if (state.notes.isEmpty) {
+            return const EmptyNotesView();
+          }
+          return ListView.builder(
+            itemCount: state.notes.length,
+            itemBuilder: (context, index) => NoteCard(
+              note: state.notes[index],
+              onDelete: (noteId) => context.read<HomeBloc>().add(HomeNoteDeleted(noteId)),
+              onRestore: (noteId) => context.read<HomeBloc>().add(HomeNoteRestored(noteId)),
+            ),
+          );
+        } else if (state is HomeLoadFailure) {
+          return Center(child: Text('加载失败: ${state.message}'));
+        }
+        return const Center(child: CircularProgressIndicator());
+      },
     );
   }
 }
