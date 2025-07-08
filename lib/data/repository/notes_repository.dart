@@ -13,6 +13,11 @@ class NotesRepository {
     return _database.noteDao.watchAllNotes();
   }
 
+  /// 获取所有笔记
+  Future<List<Note>> getAllNotes() {
+    return _database.noteDao.getAllNotes();
+  }
+
   /// 监听单个笔记
   Stream<Note> watchNote(int noteId) {
     return _database.noteDao.watchNote(noteId);

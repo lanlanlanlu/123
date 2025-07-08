@@ -9,6 +9,9 @@ import 'package:record_app/features/home/presentation/bloc/home_event.dart';
 import 'package:record_app/features/tags/presentation/bloc/tag_list_bloc.dart';
 import 'package:record_app/features/main_shell/presentation/bloc/main_shell_cubit.dart';
 import 'package:record_app/data/database/connection/native.dart' show closeDatabase;
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 // 全局单例，避免重复创建
 late final AppDatabase _database;
@@ -17,6 +20,9 @@ late final TagsRepository _tagsRepository;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 初始化中文日期格式
+  await initializeDateFormatting('zh_CN', null);
 
   // 初始化数据库和仓库 (单例模式)
   await _initializeDependencies();
@@ -158,7 +164,6 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      routerConfig: router,
       title: 'Record',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -183,6 +188,20 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
+      // 添加国际化支持
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      // 支持的语言列表
+      supportedLocales: const [
+        Locale('en', 'US'), // 英语
+        Locale('zh', 'CN'), // 中文
+      ],
+      // 如果要测试不同语言，可以取消下面这行的注释并修改值
+      // locale: const Locale('en', 'US'),
+      routerConfig: router,
     );
   }
 }

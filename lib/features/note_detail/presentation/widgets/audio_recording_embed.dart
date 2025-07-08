@@ -761,7 +761,7 @@ class _AudioRecordingPlayerWidgetState extends State<AudioRecordingPlayerWidget>
     } else {
       // 若已到结尾, 从头播放
       if (_audioPlayer.position >= (_audioPlayer.duration ?? Duration.zero)) {
-        await _audioPlayer.seek(Duration.zero);
+      await _audioPlayer.seek(Duration.zero);
       }
       await _audioPlayer.play();
     }

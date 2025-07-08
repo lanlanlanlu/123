@@ -57,6 +57,7 @@ dependencies:
   extended_text_field: ^11.0.1
   flutter_quill: ^11.4.1
   video_player: ^2.8.6
+  table_calendar: ^3.1.2
 
 dev_dependencies:
   flutter_test:

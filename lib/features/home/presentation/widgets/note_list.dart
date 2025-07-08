@@ -6,10 +6,41 @@ import 'package:record_app/features/home/presentation/widgets/empty_notes_view.d
 
 /// 笔记列表组件，用于显示所有笔记
 class NoteList extends StatelessWidget {
-  const NoteList({super.key});
+  /// 可选的笔记列表参数
+  final List<Note>? notes;
+  
+  /// 可选的笔记操作回调
+  final Function(Note)? onNoteTogglePin;
+  
+  /// 可选的笔记删除回调
+  final Function(Note)? onNoteDelete;
+
+  /// 构造函数 - 可以通过传入notes直接显示，或者通过database自动加载
+  const NoteList({
+    super.key, 
+    this.notes,
+    this.onNoteTogglePin,
+    this.onNoteDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
+    // 如果提供了notes参数，则直接使用
+    if (notes != null) {
+      if (notes!.isEmpty) {
+        return const EmptyNotesView();
+      }
+      
+      return ListView.builder(
+        itemCount: notes!.length,
+        itemBuilder: (context, index) => NoteCard(
+          note: notes![index],
+          onDelete: onNoteDelete != null ? (_) => onNoteDelete!(notes![index]) : null,
+        ),
+      );
+    }
+    
+    // 否则从database加载
     final database = Provider.of<AppDatabase>(context);
 
     return StreamBuilder<List<Note>>(
@@ -32,7 +63,10 @@ class NoteList extends StatelessWidget {
           
           return ListView.builder(
             itemCount: notes.length,
-            itemBuilder: (context, index) => NoteCard(note: notes[index]),
+            itemBuilder: (context, index) => NoteCard(
+              note: notes[index],
+              onDelete: onNoteDelete != null ? (_) => onNoteDelete!(notes[index]) : null,
+            ),
           );
         }
         

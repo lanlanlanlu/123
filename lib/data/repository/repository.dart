@@ -30,4 +30,9 @@ class Repository {
       tagsRepository: tagsRepository,
     );
   }
+  
+  /// 获取所有笔记
+  Future<List<Note>> getAllNotes() {
+    return notesRepository.getAllNotes();
+  }
 } 

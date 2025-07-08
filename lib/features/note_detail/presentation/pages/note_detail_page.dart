@@ -247,8 +247,8 @@ class _NoteDetailViewState extends State<NoteDetailView> {
             // 拦截返回事件，检查是否有未保存的更改或处于编辑模式
             onWillPop: () async {
               // 任何状态下如有未保存的更改，自动保存
-              if (state.hasUnsavedChanges) {
-                await _saveNote();
+                if (state.hasUnsavedChanges) {
+                  await _saveNote();
               }
               return true; // 允许退出页面
             },
@@ -289,52 +289,52 @@ class _NoteDetailViewState extends State<NoteDetailView> {
                   
                   // 非编辑模式下显示菜单选项
                   if (!_isEditing)
-                    PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'delete') {
-                          _showDeleteConfirmation(context);
-                        } else if (value == 'share') {
-                          _shareNoteContent(context, state.displayContent);
-                        } else if (value == 'thumbnail') {
-                          context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode());
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'thumbnail',
-                          child: Row(
-                            children: [
-                              Icon(
-                                state.thumbnailMode ? Icons.image : Icons.image_outlined,
-                                color: Theme.of(context).iconTheme.color,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(state.thumbnailMode ? '显示图片' : '隐藏图片'),
-                            ],
-                          ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        _showDeleteConfirmation(context);
+                      } else if (value == 'share') {
+                        _shareNoteContent(context, state.displayContent);
+                      } else if (value == 'thumbnail') {
+                        context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode());
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'thumbnail',
+                        child: Row(
+                          children: [
+                            Icon(
+                              state.thumbnailMode ? Icons.image : Icons.image_outlined,
+                              color: Theme.of(context).iconTheme.color,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(state.thumbnailMode ? '显示图片' : '隐藏图片'),
+                          ],
                         ),
-                        const PopupMenuItem(
-                          value: 'share',
-                          child: Row(
-                            children: [
-                              Icon(Icons.share),
-                              SizedBox(width: 8),
-                              Text('分享笔记'),
-                            ],
-                          ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'share',
+                        child: Row(
+                          children: [
+                            Icon(Icons.share),
+                            SizedBox(width: 8),
+                            Text('分享笔记'),
+                          ],
                         ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('删除', style: TextStyle(color: Colors.red)),
-                            ],
-                          ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('删除', style: TextStyle(color: Colors.red)),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
                   
                   // 编辑模式下显示完成按钮（图标），放在最右侧
                   if (_isEditing)

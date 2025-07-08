@@ -13,6 +13,15 @@ class NoteDao extends DatabaseAccessor<AppDatabase> with _$NoteDaoMixin {
         .watch();
   }
 
+  Future<List<Note>> getAllNotes() {
+    return (select(notes)
+      ..where((tbl) => tbl.isDeleted.equals(false))
+      ..orderBy([
+            (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)
+      ]))
+        .get();
+  }
+
   // 监听单个笔记
   Stream<Note> watchNote(int noteId) {
     return (select(notes)..where((tbl) => tbl.id.equals(noteId)))
