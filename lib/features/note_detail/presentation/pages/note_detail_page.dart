@@ -18,8 +18,7 @@ import 'package:record_app/core/widgets/interactive_text.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
-// 导入重构后的组件
-import 'package:record_app/features/note_detail/presentation/widgets/note_image_grid.dart';
+
 import 'package:record_app/features/note_detail/presentation/widgets/note_edit_actions_bar.dart';
 import 'package:record_app/features/note_detail/presentation/widgets/note_utils.dart';
 // 导入Quill编辑器组件

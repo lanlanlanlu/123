@@ -15,6 +15,9 @@ import 'package:record_app/features/note_detail/presentation/widgets/stats_and_t
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record_app/features/note_detail/presentation/widgets/audio_recording_embed.dart';
 import 'package:flutter/rendering.dart' show HitTestResult; // for hit testing
+import 'package:record_app/core/widgets/image_context_menu.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// 基于Flutter Quill的笔记编辑器组件
 class QuillEditorWidget extends StatefulWidget {
@@ -664,25 +667,148 @@ class CustomImageEmbedBuilder extends EmbedBuilder {
   @override
   Widget build(BuildContext context, EmbedContext embedContext) {
     final imageUrl = embedContext.node.value.data;
+    // 获取编辑模式状态
+    bool isEditing = false;
+    
+    // 尝试从父级组件中获取编辑状态
+    try {
+      final state = context.findAncestorStateOfType<_QuillEditorWidgetState>();
+      if (state != null) {
+        // 通过动态类型检查获取state中的isEditing属性
+        final widget = state.widget;
+        isEditing = widget.isEditing;
+      }
+    } catch (e) {
+      debugPrint('获取编辑状态失败: $e');
+    }
     
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8.0),
-        child: Image.file(
-          File(imageUrl),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              width: 200,
-              height: 100,
-              color: Colors.grey[300],
-              child: const Center(
-                child: Text('图片加载失败'),
-              ),
-            );
-          },
+      child: GestureDetector(
+        onLongPressStart: (LongPressStartDetails details) {
+          _showImageContextMenu(context, imageUrl, details.globalPosition, embedContext, isEditing);
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8.0),
+          child: Image.file(
+            File(imageUrl),
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                width: 200,
+                height: 100,
+                color: Colors.grey[300],
+                child: const Center(
+                  child: Text('图片加载失败'),
+                ),
+              );
+            },
+          ),
         ),
+      ),
+    );
+  }
+
+  // 显示图片上下文菜单
+  void _showImageContextMenu(
+    BuildContext context, 
+    String path, 
+    Offset tapPosition, 
+    EmbedContext embedContext,
+    bool isEditing
+  ) {
+    ImageContextMenu.show(
+      context: context,
+      position: tapPosition,
+      onThumbnailMode: () {
+        // 切换缩略图模式
+        context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode());
+      },
+      thumbnailModeText: "大图模式", // 显示为"大图模式"
+      onCopy: () => _copyImageToClipboard(context, path),
+      onShare: () => _shareImage(context, path),
+      onSave: () => _saveImage(context, path),
+      onDelete: isEditing ? () => _deleteImage(context, embedContext, path) : null,
+    );
+  }
+  
+  // 删除图片
+  void _deleteImage(BuildContext context, EmbedContext embedContext, String path) {
+    try {
+      // 尝试从父级组件中获取QuillController
+      final state = context.findAncestorStateOfType<_QuillEditorWidgetState>();
+      if (state != null) {
+        // 从_QuillEditorWidgetState获取controller
+        final controller = state.controller;
+        
+        // 删除图片嵌入
+        final offset = embedContext.node.documentOffset;
+        controller.replaceText(offset, 1, '', null);
+        
+        // 通知删除图片
+        if (state.widget.onDeleteImage != null) {
+          state.widget.onDeleteImage!(path);
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('删除图片失败: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+  
+  // 复制图片到剪贴板
+  Future<void> _copyImageToClipboard(BuildContext context, String path) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: path));
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('图片路径已复制到剪贴板'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('复制失败: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+  
+  // 分享图片
+  Future<void> _shareImage(BuildContext context, String path) async {
+    try {
+      await Share.share(path, subject: '分享图片');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('分享失败: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+  
+  // 保存图片（这里只显示提示，因为图片已经在本地了）
+  void _saveImage(BuildContext context, String path) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('图片已保存在: $path'),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
