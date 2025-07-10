@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'embed_marker.dart';
 
 /// 录音状态
 enum RecordingState {
@@ -98,56 +99,58 @@ class AudioRecordingEmbedBuilder extends EmbedBuilder {
     final embed = AudioRecordingBlockEmbed(embedContext.node.value.data);
     final state = embed.state;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: state == RecordingState.completed 
-          ? AudioRecordingPlayerWidget(
-              audioPath: embed.audioPath,
-              duration: embed.duration,
-              timestamp: embed.timestamp,
-            )
-          : InlineAudioRecordingWidget(
-              initialState: state,
-              initialDuration: embed.duration,
-              timestamp: embed.timestamp,
-              onStateChanged: (newState, path, duration) {
-                // 创建一个新的嵌入块
-                final newEmbed = embed.updateState(newState, path: path, duration: duration);
-                
-                // 尝试获取编辑器控制器
-                final controller = _findQuillControllerInContext(context);
-                if (controller != null) {
-                  final index = embedContext.node.documentOffset;
+    return QuillEmbedMarker(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: state == RecordingState.completed
+            ? AudioRecordingPlayerWidget(
+                audioPath: embed.audioPath,
+                duration: embed.duration,
+                timestamp: embed.timestamp,
+              )
+            : InlineAudioRecordingWidget(
+                initialState: state,
+                initialDuration: embed.duration,
+                timestamp: embed.timestamp,
+                onStateChanged: (newState, path, duration) {
+                  // 创建一个新的嵌入块
+                  final newEmbed = embed.updateState(newState, path: path, duration: duration);
                   
-                  // 使用 replaceText 原子替换，避免先删再插导致索引偏移
-                  if (index >= 0 && index < controller.document.length) {
-                    // 原子替换旧嵌入为新嵌入
-                    controller.replaceText(
-                      index,
-                      1,
-                      newEmbed,
-                      controller.selection,
-                    );
+                  // 尝试获取编辑器控制器
+                  final controller = _findQuillControllerInContext(context);
+                  if (controller != null) {
+                    final index = embedContext.node.documentOffset;
+                    
+                    // 使用 replaceText 原子替换，避免先删再插导致索引偏移
+                    if (index >= 0 && index < controller.document.length) {
+                      // 原子替换旧嵌入为新嵌入
+                      controller.replaceText(
+                        index,
+                        1,
+                        newEmbed,
+                        controller.selection,
+                      );
 
-                    // 若替换后当前位置不是换行,插入换行符保持布局一致
-                    if (index + 1 >= controller.document.length ||
-                        controller.document.getPlainText(index + 1, index + 2) != '\n') {
-                      controller.document.insert(index + 1, '\n');
+                      // 若替换后当前位置不是换行,插入换行符保持布局一致
+                      if (index + 1 >= controller.document.length ||
+                          controller.document.getPlainText(index + 1, index + 2) != '\n') {
+                        controller.document.insert(index + 1, '\n');
+                      }
                     }
                   }
-                }
-                
-                // 如果是完成状态，强制重新构建组件
-                if (newState == RecordingState.completed) {
-                  Future.delayed(const Duration(milliseconds: 100), () {
-                    if (context.mounted) {
-                      // 触发一个setState以重新构建组件
-                      (context as Element).markNeedsBuild();
-                    }
-                  });
-                }
-              },
-            ),
+                  
+                  // 如果是完成状态，强制重新构建组件
+                  if (newState == RecordingState.completed) {
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      if (context.mounted) {
+                        // 触发一个setState以重新构建组件
+                        (context as Element).markNeedsBuild();
+                      }
+                    });
+                  }
+                },
+              ),
+      ),
     );
   }
   
@@ -397,63 +400,65 @@ class _InlineAudioRecordingWidgetState extends State<InlineAudioRecordingWidget>
       );
     }
     
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 时间戳显示
-            Text(
-              widget.timestamp,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
+    return QuillEmbedMarker(
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 时间戳显示
+              Text(
+                widget.timestamp,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                // 录音图标，根据状态显示不同颜色
-                Icon(
-                  _recordingState == RecordingState.recording 
-                      ? Icons.mic 
-                      : Icons.mic_none,
-                  color: _recordingState == RecordingState.recording 
-                      ? Colors.redAccent 
-                      : Colors.grey,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                // 录音时长
-                Text(
-                  _recordedDuration,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  // 录音图标，根据状态显示不同颜色
+                  Icon(
+                    _recordingState == RecordingState.recording 
+                        ? Icons.mic 
+                        : Icons.mic_none,
+                    color: _recordingState == RecordingState.recording 
+                        ? Colors.redAccent 
+                        : Colors.grey,
+                    size: 24,
                   ),
-                ),
-                const Spacer(),
-                // 根据录音状态显示不同的按钮
-                if (_recordingState == RecordingState.recording || _recordingState == RecordingState.paused)
+                  const SizedBox(width: 12),
+                  // 录音时长
+                  Text(
+                    _recordedDuration,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  // 根据录音状态显示不同的按钮
+                  if (_recordingState == RecordingState.recording || _recordingState == RecordingState.paused)
+                    IconButton(
+                      icon: Icon(_recordingState == RecordingState.recording 
+                          ? Icons.pause 
+                          : Icons.play_arrow),
+                      onPressed: _pauseRecording,
+                    ),
                   IconButton(
-                    icon: Icon(_recordingState == RecordingState.recording 
-                        ? Icons.pause 
-                        : Icons.play_arrow),
-                    onPressed: _pauseRecording,
+                    icon: const Icon(Icons.check),
+                    onPressed: () => _stopRecording(),
                   ),
-                IconButton(
-                  icon: const Icon(Icons.check),
-                  onPressed: () => _stopRecording(),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -622,50 +627,52 @@ class _AudioRecordingWidgetState extends State<AudioRecordingWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: Row(
-          children: [
-            // 录音图标，根据状态显示不同颜色
-            Icon(
-              _recordingState == RecordingState.recording 
-                  ? Icons.mic 
-                  : Icons.mic_none,
-              color: _recordingState == RecordingState.recording 
-                  ? Colors.redAccent 
-                  : Colors.grey,
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            // 录音时长
-            Text(
-              _recordedDuration,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+    return QuillEmbedMarker(
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(vertical: 8.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Row(
+            children: [
+              // 录音图标，根据状态显示不同颜色
+              Icon(
+                _recordingState == RecordingState.recording 
+                    ? Icons.mic 
+                    : Icons.mic_none,
+                color: _recordingState == RecordingState.recording 
+                    ? Colors.redAccent 
+                    : Colors.grey,
+                size: 24,
               ),
-            ),
-            const Spacer(),
-            // 根据录音状态显示不同的按钮
-            if (_recordingState == RecordingState.recording || _recordingState == RecordingState.paused)
+              const SizedBox(width: 12),
+              // 录音时长
+              Text(
+                _recordedDuration,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              // 根据录音状态显示不同的按钮
+              if (_recordingState == RecordingState.recording || _recordingState == RecordingState.paused)
+                IconButton(
+                  icon: Icon(_recordingState == RecordingState.recording 
+                      ? Icons.pause 
+                      : Icons.play_arrow),
+                  onPressed: _pauseRecording,
+                ),
               IconButton(
-                icon: Icon(_recordingState == RecordingState.recording 
-                    ? Icons.pause 
-                    : Icons.play_arrow),
-                onPressed: _pauseRecording,
+                icon: const Icon(Icons.check),
+                onPressed: () => _stopRecording(),
               ),
-            IconButton(
-              icon: const Icon(Icons.check),
-              onPressed: () => _stopRecording(),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -769,73 +776,75 @@ class _AudioRecordingPlayerWidgetState extends State<AudioRecordingPlayerWidget>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 时间戳显示
-            Text(
-              widget.timestamp,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
+    return QuillEmbedMarker(
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 时间戳显示
+              Text(
+                widget.timestamp,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                // 录音图标和播放按钮
-                IconButton(
-                  icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-                  onPressed: _playPause,
-                  color: Theme.of(context).primaryColor,
-                ),
-                const SizedBox(width: 8),
-                // 进度条
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      LinearProgressIndicator(
-                        value: _progress,
-                        backgroundColor: Colors.grey[300],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Theme.of(context).primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _isPlaying ? _currentPosition : widget.duration,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  // 录音图标和播放按钮
+                  IconButton(
+                    icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+                    onPressed: _playPause,
+                    color: Theme.of(context).primaryColor,
                   ),
-                ),
-                const SizedBox(width: 8),
-                // 循环按钮
-                IconButton(
-                  icon: const Icon(Icons.replay),
-                  onPressed: () async {
-                    await _audioPlayer.seek(Duration.zero);
-                    if (!_isPlaying) {
-                      await _audioPlayer.play();
-                    }
-                  },
-                  color: Colors.grey,
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 8),
+                  // 进度条
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(
+                          value: _progress,
+                          backgroundColor: Colors.grey[300],
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).primaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _isPlaying ? _currentPosition : widget.duration,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // 循环按钮
+                  IconButton(
+                    icon: const Icon(Icons.replay),
+                    onPressed: () async {
+                      await _audioPlayer.seek(Duration.zero);
+                      if (!_isPlaying) {
+                        await _audioPlayer.play();
+                      }
+                    },
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

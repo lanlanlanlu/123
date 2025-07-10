@@ -18,6 +18,7 @@ import 'package:flutter/rendering.dart' show HitTestResult; // for hit testing
 import 'package:record_app/core/widgets/image_context_menu.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:record_app/features/note_detail/presentation/widgets/embed_marker.dart';
 
 /// 基于Flutter Quill的笔记编辑器组件
 class QuillEditorWidget extends StatefulWidget {
@@ -492,10 +493,10 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
                 ),
                 if (!widget.isEditing && widget.onTapToEdit != null)
                   Positioned.fill(
-                    child: GestureDetector(
+                    child: Listener(
                       behavior: HitTestBehavior.translucent,
-                      onTapDown: (details) {
-                        if (!_isEmbedAtPosition(details.globalPosition)) {
+                      onPointerDown: (event) {
+                        if (!_isEmbedAtPosition(event.position)) {
                           widget.onTapToEdit!();
                         }
                       },
@@ -595,14 +596,8 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
 
     for (final entry in result.path) {
       final target = entry.target;
-      final String type = target.runtimeType.toString();
-      // 根据常见的渲染对象类型粗略判断：包含图片、视频、录音等关键词时视为embed
-      if (type.contains('Image') ||
-          type.contains('Video') ||
-          type.contains('Audio') ||
-          type.contains('LinearProgress') ||
-          type.contains('Icon') && type.contains('play')
-      ) {
+      // 如命中自定义 QuillEmbedMarker，则视为 embed
+      if (target is QuillEmbedMarkerRenderBox) {
         return true;
       }
     }
@@ -667,43 +662,33 @@ class CustomImageEmbedBuilder extends EmbedBuilder {
   @override
   Widget build(BuildContext context, EmbedContext embedContext) {
     final imageUrl = embedContext.node.value.data;
-    // 获取编辑模式状态
-    bool isEditing = false;
-    
-    // 尝试从父级组件中获取编辑状态
-    try {
-      final state = context.findAncestorStateOfType<_QuillEditorWidgetState>();
-      if (state != null) {
-        // 通过动态类型检查获取state中的isEditing属性
-        final widget = state.widget;
-        isEditing = widget.isEditing;
-      }
-    } catch (e) {
-      debugPrint('获取编辑状态失败: $e');
-    }
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+    return QuillEmbedMarker(
       child: GestureDetector(
-        onLongPressStart: (LongPressStartDetails details) {
-          _showImageContextMenu(context, imageUrl, details.globalPosition, embedContext, isEditing);
+        onLongPressStart: (details) {
+          bool isEditing = false;
+          try {
+            final state = context.findAncestorStateOfType<_QuillEditorWidgetState>();
+            isEditing = state?.widget.isEditing ?? false;
+          } catch (_) {}
+          _showImageContextMenu(
+            context,
+            imageUrl,
+            details.globalPosition,
+            embedContext,
+            isEditing,
+          );
         },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8.0),
-          child: Image.file(
-            File(imageUrl),
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                width: 200,
-                height: 100,
-                color: Colors.grey[300],
-                child: const Center(
-                  child: Text('图片加载失败'),
-                ),
-              );
-            },
-          ),
+        child: Image.file(
+          File(imageUrl),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              width: 200,
+              height: 100,
+              color: Colors.grey[300],
+              child: const Center(child: Text('图片加载失败')),
+            );
+          },
         ),
       ),
     );
@@ -822,9 +807,11 @@ class CustomVideoEmbedBuilder extends EmbedBuilder {
   @override
   Widget build(BuildContext context, EmbedContext embedContext) {
     final videoPath = embedContext.node.value.data;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: _VideoPlayerWidget(videoPath: videoPath),
+    return QuillEmbedMarker(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: _VideoPlayerWidget(videoPath: videoPath),
+      ),
     );
   }
 }
@@ -859,35 +846,48 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     return FutureBuilder<void>(
       future: _initFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (snapshot.connectionState != ConnectionState.done || !_controller.value.isInitialized) {
+          // 如果Future未完成，或已完成但控制器未成功初始化，显示加载或错误状态
+          if (snapshot.hasError) {
+            return Container(
+              color: Colors.black,
+              height: 150,
+              child: Center(
+                child: Text('视频加载失败: ${snapshot.error}', style: const TextStyle(color: Colors.white)),
+              ),
+            );
+          }
           return const SizedBox(
             width: 200,
             height: 120,
             child: Center(child: CircularProgressIndicator()),
           );
         }
-        return AspectRatio(
-          aspectRatio: _controller.value.aspectRatio,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              VideoPlayer(_controller),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _controller.value.isPlaying ? _controller.pause() : _controller.play();
-                  });
-                },
-                child: Icon(
+
+        // 只有当Future完成且控制器成功初始化后才构建播放器
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            setState(() {
+              _controller.value.isPlaying ? _controller.pause() : _controller.play();
+            });
+          },
+          child: AspectRatio(
+            aspectRatio: _controller.value.aspectRatio,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                VideoPlayer(_controller),
+                Icon(
                   _controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
                   size: 48,
                   color: Colors.white70,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
-} 
+}
