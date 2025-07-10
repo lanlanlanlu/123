@@ -19,6 +19,7 @@ import 'package:record_app/core/widgets/image_context_menu.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:record_app/features/note_detail/presentation/widgets/embed_marker.dart';
+import 'package:record_app/core/widgets/context_menu.dart';
 
 /// 基于Flutter Quill的笔记编辑器组件
 class QuillEditorWidget extends StatefulWidget {
@@ -603,6 +604,30 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
     }
     return false;
   }
+
+  // 显示视频/音频通用菜单
+  void _deleteEmbed(EmbedContext embedContext) {
+    final offset = embedContext.node.documentOffset;
+    _controller.replaceText(offset, 1, '', null);
+  }
+
+  void _showMediaContextMenu({
+    required BuildContext context,
+    required Offset position,
+    required String path,
+    required EmbedContext embedContext,
+    required bool isEditing,
+    bool isVideo = true,
+  }) {
+    final items = <ContextMenuItem>[
+      ContextMenuItem(title: '复制', onTap: () => Clipboard.setData(ClipboardData(text: path))),
+      ContextMenuItem(title: '分享', onTap: () => Share.share(path)),
+      if (isEditing)
+        ContextMenuItem(title: '删除', onTap: () => _deleteEmbed(embedContext), isDestructive: true),
+    ];
+
+    CommonContextMenu.show(context: context, position: position, items: items);
+  }
 }
 
 /// 录音叠加组件 - 用于显示录音界面
@@ -808,9 +833,26 @@ class CustomVideoEmbedBuilder extends EmbedBuilder {
   Widget build(BuildContext context, EmbedContext embedContext) {
     final videoPath = embedContext.node.value.data;
     return QuillEmbedMarker(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: _VideoPlayerWidget(videoPath: videoPath),
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          bool isEditing = false;
+          try {
+            final state = context.findAncestorStateOfType<_QuillEditorWidgetState>();
+            isEditing = state?.widget.isEditing ?? false;
+            state?._showMediaContextMenu(
+              context: context,
+              position: details.globalPosition,
+              path: videoPath,
+              embedContext: embedContext,
+              isEditing: isEditing,
+              isVideo: true,
+            );
+          } catch (_) {}
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: _VideoPlayerWidget(videoPath: videoPath),
+        ),
       ),
     );
   }

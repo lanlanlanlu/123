@@ -10,6 +10,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'embed_marker.dart';
+import 'package:record_app/core/widgets/context_menu.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:flutter/services.dart';
+import 'dart:io';
+import 'package:path/path.dart' as p;
 
 /// 录音状态
 enum RecordingState {
@@ -60,6 +65,10 @@ class AudioRecordingBlockEmbed extends CustomBlockEmbed {
     if (duration != null) {
       jsonData['duration'] = duration;
     }
+    if (jsonData.containsKey('timestamp') && path != null) {
+      // 如果文件已更名，更新时间戳显示为新文件名不含扩展名
+      jsonData['timestamp'] = p.basenameWithoutExtension(path);
+    }
     return AudioRecordingBlockEmbed(jsonEncode(jsonData));
   }
 
@@ -103,10 +112,63 @@ class AudioRecordingEmbedBuilder extends EmbedBuilder {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
         child: state == RecordingState.completed
-            ? AudioRecordingPlayerWidget(
-                audioPath: embed.audioPath,
-                duration: embed.duration,
-                timestamp: embed.timestamp,
+            ? GestureDetector(
+                onLongPressStart: (details) {
+                  final isEditing = !embedContext.controller.readOnly;
+                  void delete() {
+                    final offset = embedContext.node.documentOffset;
+                    embedContext.controller.replaceText(offset, 1, '', null);
+                  }
+
+                  Future<void> rename() async {
+                    final TextEditingController controller = TextEditingController(text: embed.timestamp);
+                    final newName = await showDialog<String?>(
+                      context: context,
+                      builder: (ctx) {
+                        return AlertDialog(
+                          title: const Text('重命名录音'),
+                          content: TextField(controller: controller, decoration: const InputDecoration(hintText: '文件名')),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+                            TextButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('确定')),
+                          ],
+                        );
+                      },
+                    );
+                    if (newName == null || newName.isEmpty) return;
+                    final dir = p.dirname(embed.audioPath);
+                    final newPath = p.join(dir, '$newName${p.extension(embed.audioPath)}');
+                    try {
+                      await File(embed.audioPath).rename(newPath);
+                      // 更新 embed 信息
+                      final offset = embedContext.node.documentOffset;
+                      final newEmbed = embed.updateState(RecordingState.completed, path: newPath, duration: embed.duration);
+                      embedContext.controller.replaceText(offset, 1, newEmbed, embedContext.controller.selection);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('重命名失败: $e')));
+                      }
+                    }
+                  }
+
+                  final items = <ContextMenuItem>[
+                    ContextMenuItem(title: '重命名', onTap: rename),
+                    ContextMenuItem(title: '复制', onTap: () => Clipboard.setData(ClipboardData(text: embed.audioPath))),
+                    ContextMenuItem(title: '分享', onTap: () => Share.share(embed.audioPath)),
+                    if (isEditing) ContextMenuItem(title: '删除', onTap: delete, isDestructive: true),
+                  ];
+
+                  CommonContextMenu.show(
+                    context: context,
+                    position: details.globalPosition,
+                    items: items,
+                  );
+                },
+                child: AudioRecordingPlayerWidget(
+                  audioPath: embed.audioPath,
+                  duration: embed.duration,
+                  timestamp: embed.timestamp,
+                ),
               )
             : InlineAudioRecordingWidget(
                 initialState: state,
