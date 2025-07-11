@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart'; // 添加手势识别器导入
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:path/path.dart' as p;
@@ -90,6 +91,8 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
   final ImagePicker _picker = ImagePicker();
   final FocusNode _editorFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
+  // 跟踪触摸起始位置
+  Offset? _touchStartPosition;
 
   // 提供一个getter来访问QuillController
   QuillController get controller => _controller;
@@ -494,13 +497,31 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
                 ),
                 if (!widget.isEditing && widget.onTapToEdit != null)
                   Positioned.fill(
-                    child: GestureDetector(
+                    child: Listener(
                       behavior: HitTestBehavior.translucent,
-                      // 使用 onTapUp 仅在点击结束且无滑动时触发，提升滚动体验
-                      onTapUp: (details) {
-                        if (!_isEmbedAtPosition(details.globalPosition)) {
-                          widget.onTapToEdit!();
+                      onPointerDown: (event) {
+                        // 记录触摸起始位置
+                        if (event.kind == PointerDeviceKind.touch) {
+                          _touchStartPosition = event.position;
                         }
+                      },
+                      onPointerUp: (event) {
+                        // 只在起始位置记录存在时处理
+                        if (event.kind == PointerDeviceKind.touch && _touchStartPosition != null) {
+                          // 计算总移动距离
+                          final distance = (_touchStartPosition! - event.position).distance;
+                          // 清除起始位置
+                          _touchStartPosition = null;
+                          
+                          // 如果总移动距离小于阈值且不在嵌入元素上，视为点击
+                          if (distance < 10.0 && !_isEmbedAtPosition(event.position)) {
+                            widget.onTapToEdit!();
+                          }
+                        }
+                      },
+                      // 手势取消时也清除起始位置
+                      onPointerCancel: (event) {
+                        _touchStartPosition = null;
                       },
                     ),
                   ),
