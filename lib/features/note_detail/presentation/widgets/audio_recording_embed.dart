@@ -34,10 +34,12 @@ class AudioRecordingBlockEmbed extends CustomBlockEmbed {
 
   /// 创建一个新的录音嵌入（录音中状态）
   static AudioRecordingBlockEmbed createNew() {
+    final now = DateTime.now();
+    final formattedTime = DateFormat('yyyy年M月d日_HH_mm_ss').format(now);
     final recordingData = {
       'path': '',
       'duration': '00:00:00',
-      'timestamp': DateFormat('yyyy年M月d日 HH:mm:ss').format(DateTime.now()),
+      'timestamp': 'audio_$formattedTime', // 使用与文件名一致的格式
       'state': RecordingState.recording.index,
     };
     return AudioRecordingBlockEmbed(jsonEncode(recordingData));
@@ -45,11 +47,14 @@ class AudioRecordingBlockEmbed extends CustomBlockEmbed {
 
   /// 从已有数据创建录音嵌入
   static AudioRecordingBlockEmbed fromDocument(String path, String duration, [String? timestamp, RecordingState state = RecordingState.completed]) {
+    // 如果没有提供timestamp，则使用文件名（不含扩展名）作为timestamp
+    final actualTimestamp = timestamp ?? p.basenameWithoutExtension(path);
+    
     // 构造格式: 路径|持续时间|时间戳|状态
     final recordingData = {
       'path': path,
       'duration': duration,
-      'timestamp': timestamp ?? DateFormat('yyyy年M月d日 HH:mm:ss').format(DateTime.now()),
+      'timestamp': actualTimestamp,
       'state': state.index,
     };
     return AudioRecordingBlockEmbed(jsonEncode(recordingData));
@@ -61,13 +66,11 @@ class AudioRecordingBlockEmbed extends CustomBlockEmbed {
     jsonData['state'] = newState.index;
     if (path != null) {
       jsonData['path'] = path;
+      // 如果文件路径更新了，同时更新timestamp为文件名（不含扩展名）
+      jsonData['timestamp'] = p.basenameWithoutExtension(path);
     }
     if (duration != null) {
       jsonData['duration'] = duration;
-    }
-    if (jsonData.containsKey('timestamp') && path != null) {
-      // 如果文件已更名，更新时间戳显示为新文件名不含扩展名
-      jsonData['timestamp'] = p.basenameWithoutExtension(path);
     }
     return AudioRecordingBlockEmbed(jsonEncode(jsonData));
   }
@@ -121,7 +124,12 @@ class AudioRecordingEmbedBuilder extends EmbedBuilder {
                   }
 
                   Future<void> rename() async {
-                    final TextEditingController controller = TextEditingController(text: embed.timestamp);
+                    // 获取当前文件名（不含扩展名）
+                    final currentFileName = p.basenameWithoutExtension(embed.audioPath);
+                    
+                    // 使用当前文件名作为初始值
+                    final TextEditingController controller = TextEditingController(text: currentFileName);
+                    
                     final newName = await showDialog<String?>(
                       context: context,
                       builder: (ctx) {
@@ -327,8 +335,10 @@ class _InlineAudioRecordingWidgetState extends State<InlineAudioRecordingWidget>
   /// 开始录音
   Future<void> _startRecording() async {
     try {
+      final now = DateTime.now();
+      final formattedTime = DateFormat('yyyy年M月d日_HH_mm_ss').format(now);
       final appDir = await getApplicationDocumentsDirectory();
-      final fileName = 'audio_recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final fileName = 'audio_$formattedTime.m4a';
       _recordingPath = '${appDir.path}/$fileName';
 
       // 检查录音权限
@@ -349,7 +359,7 @@ class _InlineAudioRecordingWidgetState extends State<InlineAudioRecordingWidget>
           _recordedDuration = '00:00:00';
         });
         
-        // 通知父组件状态变化
+        // 通知父组件状态变化，使用文件名而不是时间戳
         widget.onStateChanged(_recordingState, _recordingPath, _recordedDuration);
         
         // 启动计时器，更新显示的录音时长
@@ -414,7 +424,8 @@ class _InlineAudioRecordingWidgetState extends State<InlineAudioRecordingWidget>
             _isCompleted = true;
           });
           
-          // 通知父组件录音已完成
+          // 通知父组件录音已完成，使用文件名（不含扩展名）作为时间戳
+          final fileName = p.basenameWithoutExtension(_recordingPath);
           widget.onStateChanged(RecordingState.completed, _recordingPath, _recordedDuration);
           
           // 延迟一段时间后，强制重新构建组件以显示播放器
@@ -582,10 +593,12 @@ class _AudioRecordingWidgetState extends State<AudioRecordingWidget> {
   /// 开始录音
   Future<void> _startRecording() async {
     try {
+      final now = DateTime.now();
+      final formattedTime = DateFormat('yyyy年M月d日_HH_mm_ss').format(now);
       final appDir = await getApplicationDocumentsDirectory();
-      final fileName = 'audio_recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final fileName = 'audio_$formattedTime.m4a';
       _recordingPath = '${appDir.path}/$fileName';
-      _timestamp = DateFormat('yyyy年M月d日 HH:mm:ss').format(DateTime.now());
+      _timestamp = p.basenameWithoutExtension(_recordingPath);
 
       // 检查录音权限
       if (await _audioRecorder.hasPermission()) {
