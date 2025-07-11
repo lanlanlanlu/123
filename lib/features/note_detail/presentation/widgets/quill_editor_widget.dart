@@ -418,69 +418,69 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 标题输入框 - 在编辑模式下可以编辑，浏览模式下只显示
-          widget.isEditing 
-              ? TextField(
-                  controller: widget.titleController,
-                  decoration: const InputDecoration(
-                    hintText: '标题',
-                    hintStyle: TextStyle(color: Colors.grey),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  style: const TextStyle(
-                    fontSize: 20, 
-                    fontWeight: FontWeight.bold,
-                    height: 1.5,
-                    color: Colors.black87,
-                  ),
-                  onChanged: (value) {
-                    // 使用防抖处理标题更新，避免频繁触发
-                    _debounce(() {
-                      widget.onTitleChanged(value);
-                    });
-                  },
-                )
-              : Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Text(
-                    widget.titleController.text.isEmpty ? '无标题' : widget.titleController.text,
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 标题输入框 - 在编辑模式下可以编辑，浏览模式下只显示
+            widget.isEditing 
+                ? TextField(
+                    controller: widget.titleController,
+                    decoration: const InputDecoration(
+                      hintText: '标题',
+                      hintStyle: TextStyle(color: Colors.grey),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                     style: const TextStyle(
                       fontSize: 20, 
                       fontWeight: FontWeight.bold,
                       height: 1.5,
                       color: Colors.black87,
                     ),
+                    onChanged: (value) {
+                      // 使用防抖处理标题更新，避免频繁触发
+                      _debounce(() {
+                        widget.onTitleChanged(value);
+                      });
+                    },
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Text(
+                      widget.titleController.text.isEmpty ? '无标题' : widget.titleController.text,
+                      style: const TextStyle(
+                        fontSize: 20, 
+                        fontWeight: FontWeight.bold,
+                        height: 1.5,
+                        color: Colors.black87,
+                      ),
+                    ),
                   ),
-                ),
-          
-          // 字数统计和标签显示栏
-          Padding(
-            padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-            child: StatsAndTagsBar(
-              noteId: widget.noteId,
-              content: _controller.document.toPlainText(),
-              isEditing: widget.isEditing,
-              onTagRemoved: widget.isEditing ? widget.onTagRemoved : null,
+            
+            // 字数统计和标签显示栏
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+              child: StatsAndTagsBar(
+                noteId: widget.noteId,
+                content: _controller.document.toPlainText(),
+                isEditing: widget.isEditing,
+                onTagRemoved: widget.isEditing ? widget.onTagRemoved : null,
+              ),
             ),
-          ),
-          
-          // 编辑器区域 - 根据模式切换readOnly状态
-          Expanded(
-            child: Stack(
+            
+            // 编辑器区域 - 根据模式切换readOnly状态
+            Stack(
               children: [
                 QuillEditor.basic(
                   controller: _controller,
                   focusNode: _editorFocusNode,
-                  scrollController: _scrollController,
                   config: QuillEditorConfig(
                     placeholder: widget.isEditing ? '开始输入...' : '',
-                    scrollable: true,
+                    scrollable: false,
                     autoFocus: widget.isEditing,
-                    expands: true,
+                    expands: false,
                     padding: EdgeInsets.zero,
                     embedBuilders: [
                       CustomImageEmbedBuilder(), 
@@ -494,10 +494,11 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
                 ),
                 if (!widget.isEditing && widget.onTapToEdit != null)
                   Positioned.fill(
-                    child: Listener(
+                    child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onPointerDown: (event) {
-                        if (!_isEmbedAtPosition(event.position)) {
+                      // 使用 onTapUp 仅在点击结束且无滑动时触发，提升滚动体验
+                      onTapUp: (details) {
+                        if (!_isEmbedAtPosition(details.globalPosition)) {
                           widget.onTapToEdit!();
                         }
                       },
@@ -505,8 +506,8 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
                   ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
