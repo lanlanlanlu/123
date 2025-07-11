@@ -11,11 +11,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:record_app/features/note_detail/presentation/bloc/note_detail_bloc.dart';
 import 'package:record_app/features/note_detail/presentation/bloc/note_detail_event.dart';
+import 'package:record_app/features/note_detail/presentation/bloc/note_detail_state.dart';
 import 'package:record_app/features/note_detail/presentation/widgets/stats_and_tags_bar.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record_app/features/note_detail/presentation/widgets/audio_recording_embed.dart';
 import 'package:flutter/rendering.dart' show HitTestResult; // for hit testing
-import 'package:record_app/core/widgets/image_context_menu.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:record_app/features/note_detail/presentation/widgets/embed_marker.dart';
@@ -619,7 +619,15 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
     required bool isEditing,
     bool isVideo = true,
   }) {
+    // 获取当前缩略图模式状态
+    final noteDetailState = context.read<NoteDetailBloc>().state;
+    final bool isThumbnailMode = noteDetailState is NoteDetailLoaded ? noteDetailState.thumbnailMode : false;
+    
     final items = <ContextMenuItem>[
+      ContextMenuItem(
+        title: isThumbnailMode ? "大图模式" : "小图模式", 
+        onTap: () => context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode()),
+      ),
       ContextMenuItem(title: '复制', onTap: () => Clipboard.setData(ClipboardData(text: path))),
       ContextMenuItem(title: '分享', onTap: () => Share.share(path)),
       if (isEditing)
@@ -687,6 +695,16 @@ class CustomImageEmbedBuilder extends EmbedBuilder {
   @override
   Widget build(BuildContext context, EmbedContext embedContext) {
     final imageUrl = embedContext.node.value.data;
+    
+    // 获取缩略图模式状态
+    final noteDetailState = context.watch<NoteDetailBloc>().state;
+    final bool isThumbnailMode = noteDetailState is NoteDetailLoaded ? noteDetailState.thumbnailMode : false;
+    
+    // 根据模式调整图片大小
+    final BoxConstraints imageConstraints = isThumbnailMode 
+        ? const BoxConstraints(maxWidth: 100, maxHeight: 100) // 1/4大小
+        : const BoxConstraints(); // 原始大小
+    
     return QuillEmbedMarker(
       child: GestureDetector(
         onLongPressStart: (details) {
@@ -703,17 +721,28 @@ class CustomImageEmbedBuilder extends EmbedBuilder {
             isEditing,
           );
         },
-        child: Image.file(
-          File(imageUrl),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              width: 200,
-              height: 100,
-              color: Colors.grey[300],
-              child: const Center(child: Text('图片加载失败')),
-            );
-          },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 始终确保媒体前有足够的空间
+            const SizedBox(height: 8.0),
+            Container(
+              constraints: imageConstraints,
+              margin: const EdgeInsets.only(right: 8.0, bottom: 8.0),
+              child: Image.file(
+                File(imageUrl),
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: isThumbnailMode ? 100 : 200,
+                    height: isThumbnailMode ? 50 : 100,
+                    color: Colors.grey[300],
+                    child: const Center(child: Text('图片加载失败')),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -727,18 +756,37 @@ class CustomImageEmbedBuilder extends EmbedBuilder {
     EmbedContext embedContext,
     bool isEditing
   ) {
-    ImageContextMenu.show(
+    // 获取当前缩略图模式状态
+    final noteDetailState = context.read<NoteDetailBloc>().state;
+    final bool isThumbnailMode = noteDetailState is NoteDetailLoaded ? noteDetailState.thumbnailMode : false;
+    
+    CommonContextMenu.show(
       context: context,
       position: tapPosition,
-      onThumbnailMode: () {
-        // 切换缩略图模式
-        context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode());
-      },
-      thumbnailModeText: "大图模式", // 显示为"大图模式"
-      onCopy: () => _copyImageToClipboard(context, path),
-      onShare: () => _shareImage(context, path),
-      onSave: () => _saveImage(context, path),
-      onDelete: isEditing ? () => _deleteImage(context, embedContext, path) : null,
+      items: [
+        ContextMenuItem(
+          title: isThumbnailMode ? "大图模式" : "小图模式", 
+          onTap: () => context.read<NoteDetailBloc>().add(const NoteDetailToggleThumbnailMode()),
+        ),
+        ContextMenuItem(
+          title: '复制', 
+          onTap: () => _copyImageToClipboard(context, path),
+        ),
+        ContextMenuItem(
+          title: '分享', 
+          onTap: () => _shareImage(context, path),
+        ),
+        ContextMenuItem(
+          title: '保存', 
+          onTap: () => _saveImage(context, path),
+        ),
+        if (isEditing) 
+          ContextMenuItem(
+            title: '删除', 
+            onTap: () => _deleteImage(context, embedContext, path), 
+            isDestructive: true,
+          ),
+      ],
     );
   }
   
@@ -832,6 +880,16 @@ class CustomVideoEmbedBuilder extends EmbedBuilder {
   @override
   Widget build(BuildContext context, EmbedContext embedContext) {
     final videoPath = embedContext.node.value.data;
+    
+    // 获取缩略图模式状态
+    final noteDetailState = context.watch<NoteDetailBloc>().state;
+    final bool isThumbnailMode = noteDetailState is NoteDetailLoaded ? noteDetailState.thumbnailMode : false;
+    
+    // 根据模式调整视频大小
+    final BoxConstraints videoConstraints = isThumbnailMode 
+        ? const BoxConstraints(maxWidth: 120, maxHeight: 68) // 大约为原尺寸的1/4 (保持16:9比例)
+        : const BoxConstraints(); // 原始大小
+    
     return QuillEmbedMarker(
       child: GestureDetector(
         onLongPressStart: (details) {
@@ -849,9 +907,20 @@ class CustomVideoEmbedBuilder extends EmbedBuilder {
             );
           } catch (_) {}
         },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: _VideoPlayerWidget(videoPath: videoPath),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 始终确保媒体前有足够的空间
+            const SizedBox(height: 8.0),
+            Container(
+              constraints: videoConstraints,
+              margin: const EdgeInsets.only(right: 8.0, bottom: 8.0),
+              child: _VideoPlayerWidget(
+                videoPath: videoPath, 
+                isThumbnailMode: isThumbnailMode
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -860,7 +929,8 @@ class CustomVideoEmbedBuilder extends EmbedBuilder {
 
 class _VideoPlayerWidget extends StatefulWidget {
   final String videoPath;
-  const _VideoPlayerWidget({required this.videoPath});
+  final bool isThumbnailMode;
+  const _VideoPlayerWidget({required this.videoPath, required this.isThumbnailMode});
 
   @override
   State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
@@ -893,15 +963,15 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
           if (snapshot.hasError) {
             return Container(
               color: Colors.black,
-              height: 150,
+              height: widget.isThumbnailMode ? 90 : 150,
               child: Center(
                 child: Text('视频加载失败: ${snapshot.error}', style: const TextStyle(color: Colors.white)),
               ),
             );
           }
-          return const SizedBox(
-            width: 200,
-            height: 120,
+          return Container(
+            color: Colors.black,
+            height: widget.isThumbnailMode ? 90 : 150,
             child: Center(child: CircularProgressIndicator()),
           );
         }
@@ -922,7 +992,7 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
                 VideoPlayer(_controller),
                 Icon(
                   _controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
-                  size: 48,
+                  size: widget.isThumbnailMode ? 36 : 48,
                   color: Colors.white70,
                 ),
               ],

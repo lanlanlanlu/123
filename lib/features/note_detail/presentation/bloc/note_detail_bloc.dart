@@ -51,6 +51,9 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
       await _noteSubscription?.cancel();
       await _tagsSubscription?.cancel();
       
+      // 获取笔记的缩略图模式
+      final thumbnailMode = await _notesRepository.getNoteThumbnailMode(event.noteId);
+      
       // 订阅笔记流
       _noteSubscription = _notesRepository.watchNote(event.noteId).listen(
         (note) => add(_NoteDetailUpdated(note)),
@@ -62,6 +65,18 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
         (tags) => add(_NoteDetailTagsUpdated(tags)),
         onError: (error) => add(_NoteDetailError(error.toString())),
       );
+      
+      // 获取笔记和标签初始数据
+      final note = await _notesRepository.getNoteById(event.noteId);
+      final tags = await _tagsRepository.getTagsForNote(event.noteId);
+      
+      // 立即发出加载完成状态，包含缩略图模式
+      emit(NoteDetailLoaded(
+        note: note,
+        tags: tags,
+        editMode: NoteEditMode.editing,
+        thumbnailMode: thumbnailMode,
+      ));
     } catch (e) {
       emit(NoteDetailLoadFailure(e.toString()));
     }
@@ -72,15 +87,8 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
     final currentState = state;
     
     if (currentState is NoteDetailLoaded) {
-      emit(currentState.copyWith(note: event.note));
-    } else if (currentState is NoteDetailLoading || currentState is NoteDetailInitial) {
-      // 首次加载，需要等待标签数据
-      final tags = await _tagsRepository.getTagsForNote(_currentNoteId!);
-      emit(NoteDetailLoaded(
-        note: event.note,
-        tags: tags,
-        editMode: NoteEditMode.editing, // 直接进入编辑模式
-      ));
+      // 保持当前的缩略图模式
+      emit(currentState.copyWith(note: event.note, thumbnailMode: currentState.thumbnailMode));
     }
   }
   
@@ -148,6 +156,7 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
           title: Value(title),
           content: Value(contentToSave), // 内容不再包含标题
           locationInfo: Value(locationToSave),
+          thumbnailMode: Value(currentState.thumbnailMode), // 保存当前的大小图模式状态
           updatedAt: Value(DateTime.now()),
         );
         
@@ -192,6 +201,7 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
           clearDraft: true,
           editMode: NoteEditMode.editing,
           note: updatedNote,
+          thumbnailMode: currentState.thumbnailMode, // 确保保持当前的大小图模式状态
           hasImageChanges: false,
           imageChangeCount: 0,
         ));
@@ -201,6 +211,7 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
           clearDraft: true,
           editMode: NoteEditMode.editing,
           note: updatedNote,
+          thumbnailMode: currentState.thumbnailMode, // 确保保持当前的大小图模式状态
           hasImageChanges: false,
           imageChangeCount: 0,
         ));
@@ -273,15 +284,26 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
     emit(NoteDetailLoadFailure(event.message));
   }
 
-  /// 处理切换小图模式事件
+  /// 处理切换缩略图模式事件
   Future<void> _onToggleThumbnailMode(NoteDetailToggleThumbnailMode event, Emitter<NoteDetailState> emit) async {
     final currentState = state;
-    
-    if (currentState is NoteDetailLoaded) {
-      // 反转当前的小图模式状态
-      emit(currentState.copyWith(
-        thumbnailMode: !currentState.thumbnailMode,
-      ));
+    if (currentState is NoteDetailLoaded && _currentNoteId != null) {
+      try {
+        // 切换模式
+        final newThumbnailMode = !currentState.thumbnailMode;
+        
+        // 立即更新UI状态
+        emit(currentState.copyWith(thumbnailMode: newThumbnailMode));
+        
+        // 持久化到数据库
+        await _notesRepository.updateNoteThumbnailMode(_currentNoteId!, newThumbnailMode);
+      } catch (e) {
+        // 错误处理
+        emit(NoteDetailLoadFailure('切换小图模式失败: ${e.toString()}'));
+        
+        // 恢复之前的状态
+        emit(currentState);
+      }
     }
   }
 

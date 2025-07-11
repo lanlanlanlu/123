@@ -15,6 +15,8 @@ class Notes extends Table {
   BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+  // 是否处于小图模式
+  BoolColumn get thumbnailMode => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now())();
   DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now())();
 }
@@ -67,9 +69,9 @@ class NoteWithTags {
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
-  // 【修改】schemaVersion 从 6 变为 7
+  // 【修改】schemaVersion 从 7 变为 8
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -97,6 +99,10 @@ class AppDatabase extends _$AppDatabase {
           // 为现有的笔记添加默认的创建和更新时间
           await customStatement('UPDATE notes SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL');
           await customStatement('UPDATE notes SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL');
+        }
+        // 【新增】从版本 7 升级到 8 的逻辑：给 notes 加 thumbnail_mode 字段
+        if (from < 8) {
+          await m.addColumn(notes, notes.thumbnailMode as GeneratedColumn<Object>);
         }
       },
     );

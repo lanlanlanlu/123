@@ -71,6 +71,16 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _thumbnailModeMeta =
+      const VerificationMeta('thumbnailMode');
+  @override
+  late final GeneratedColumn<bool> thumbnailMode = GeneratedColumn<bool>(
+      'thumbnail_mode', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("thumbnail_mode" IN (0, 1))'),
+      defaultValue: const Constant(false));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -97,6 +107,7 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
         isPinned,
         isArchived,
         isDeleted,
+        thumbnailMode,
         createdAt,
         updatedAt
       ];
@@ -149,6 +160,12 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
       context.handle(_isDeletedMeta,
           isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
     }
+    if (data.containsKey('thumbnail_mode')) {
+      context.handle(
+          _thumbnailModeMeta,
+          thumbnailMode.isAcceptableOrUnknown(
+              data['thumbnail_mode']!, _thumbnailModeMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -182,6 +199,8 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
           .read(DriftSqlType.bool, data['${effectivePrefix}is_archived'])!,
       isDeleted: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+      thumbnailMode: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}thumbnail_mode'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
@@ -204,6 +223,7 @@ class Note extends DataClass implements Insertable<Note> {
   final bool isPinned;
   final bool isArchived;
   final bool isDeleted;
+  final bool thumbnailMode;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Note(
@@ -215,6 +235,7 @@ class Note extends DataClass implements Insertable<Note> {
       required this.isPinned,
       required this.isArchived,
       required this.isDeleted,
+      required this.thumbnailMode,
       required this.createdAt,
       required this.updatedAt});
   @override
@@ -232,6 +253,7 @@ class Note extends DataClass implements Insertable<Note> {
     map['is_pinned'] = Variable<bool>(isPinned);
     map['is_archived'] = Variable<bool>(isArchived);
     map['is_deleted'] = Variable<bool>(isDeleted);
+    map['thumbnail_mode'] = Variable<bool>(thumbnailMode);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -250,6 +272,7 @@ class Note extends DataClass implements Insertable<Note> {
       isPinned: Value(isPinned),
       isArchived: Value(isArchived),
       isDeleted: Value(isDeleted),
+      thumbnailMode: Value(thumbnailMode),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -267,6 +290,7 @@ class Note extends DataClass implements Insertable<Note> {
       isPinned: serializer.fromJson<bool>(json['isPinned']),
       isArchived: serializer.fromJson<bool>(json['isArchived']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+      thumbnailMode: serializer.fromJson<bool>(json['thumbnailMode']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -283,6 +307,7 @@ class Note extends DataClass implements Insertable<Note> {
       'isPinned': serializer.toJson<bool>(isPinned),
       'isArchived': serializer.toJson<bool>(isArchived),
       'isDeleted': serializer.toJson<bool>(isDeleted),
+      'thumbnailMode': serializer.toJson<bool>(thumbnailMode),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -297,6 +322,7 @@ class Note extends DataClass implements Insertable<Note> {
           bool? isPinned,
           bool? isArchived,
           bool? isDeleted,
+          bool? thumbnailMode,
           DateTime? createdAt,
           DateTime? updatedAt}) =>
       Note(
@@ -309,6 +335,7 @@ class Note extends DataClass implements Insertable<Note> {
         isPinned: isPinned ?? this.isPinned,
         isArchived: isArchived ?? this.isArchived,
         isDeleted: isDeleted ?? this.isDeleted,
+        thumbnailMode: thumbnailMode ?? this.thumbnailMode,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -325,6 +352,9 @@ class Note extends DataClass implements Insertable<Note> {
       isArchived:
           data.isArchived.present ? data.isArchived.value : this.isArchived,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+      thumbnailMode: data.thumbnailMode.present
+          ? data.thumbnailMode.value
+          : this.thumbnailMode,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -341,6 +371,7 @@ class Note extends DataClass implements Insertable<Note> {
           ..write('isPinned: $isPinned, ')
           ..write('isArchived: $isArchived, ')
           ..write('isDeleted: $isDeleted, ')
+          ..write('thumbnailMode: $thumbnailMode, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -349,7 +380,7 @@ class Note extends DataClass implements Insertable<Note> {
 
   @override
   int get hashCode => Object.hash(id, title, content, locationInfo, color,
-      isPinned, isArchived, isDeleted, createdAt, updatedAt);
+      isPinned, isArchived, isDeleted, thumbnailMode, createdAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -362,6 +393,7 @@ class Note extends DataClass implements Insertable<Note> {
           other.isPinned == this.isPinned &&
           other.isArchived == this.isArchived &&
           other.isDeleted == this.isDeleted &&
+          other.thumbnailMode == this.thumbnailMode &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -375,6 +407,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
   final Value<bool> isPinned;
   final Value<bool> isArchived;
   final Value<bool> isDeleted;
+  final Value<bool> thumbnailMode;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const NotesCompanion({
@@ -386,6 +419,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
     this.isPinned = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.thumbnailMode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -398,6 +432,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
     this.isPinned = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.thumbnailMode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   })  : title = Value(title),
@@ -411,6 +446,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
     Expression<bool>? isPinned,
     Expression<bool>? isArchived,
     Expression<bool>? isDeleted,
+    Expression<bool>? thumbnailMode,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -423,6 +459,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
       if (isPinned != null) 'is_pinned': isPinned,
       if (isArchived != null) 'is_archived': isArchived,
       if (isDeleted != null) 'is_deleted': isDeleted,
+      if (thumbnailMode != null) 'thumbnail_mode': thumbnailMode,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -437,6 +474,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
       Value<bool>? isPinned,
       Value<bool>? isArchived,
       Value<bool>? isDeleted,
+      Value<bool>? thumbnailMode,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt}) {
     return NotesCompanion(
@@ -448,6 +486,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
       isPinned: isPinned ?? this.isPinned,
       isArchived: isArchived ?? this.isArchived,
       isDeleted: isDeleted ?? this.isDeleted,
+      thumbnailMode: thumbnailMode ?? this.thumbnailMode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -480,6 +519,9 @@ class NotesCompanion extends UpdateCompanion<Note> {
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
+    if (thumbnailMode.present) {
+      map['thumbnail_mode'] = Variable<bool>(thumbnailMode.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -500,6 +542,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
           ..write('isPinned: $isPinned, ')
           ..write('isArchived: $isArchived, ')
           ..write('isDeleted: $isDeleted, ')
+          ..write('thumbnailMode: $thumbnailMode, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1360,6 +1403,7 @@ typedef $$NotesTableCreateCompanionBuilder = NotesCompanion Function({
   Value<bool> isPinned,
   Value<bool> isArchived,
   Value<bool> isDeleted,
+  Value<bool> thumbnailMode,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -1372,6 +1416,7 @@ typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
   Value<bool> isPinned,
   Value<bool> isArchived,
   Value<bool> isDeleted,
+  Value<bool> thumbnailMode,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -1455,6 +1500,9 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get thumbnailMode => $composableBuilder(
+      column: $table.thumbnailMode, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -1560,6 +1608,10 @@ class $$NotesTableOrderingComposer
   ColumnOrderings<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get thumbnailMode => $composableBuilder(
+      column: $table.thumbnailMode,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -1599,6 +1651,9 @@ class $$NotesTableAnnotationComposer
 
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  GeneratedColumn<bool> get thumbnailMode => $composableBuilder(
+      column: $table.thumbnailMode, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1702,6 +1757,7 @@ class $$NotesTableTableManager extends RootTableManager<
             Value<bool> isPinned = const Value.absent(),
             Value<bool> isArchived = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<bool> thumbnailMode = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
           }) =>
@@ -1714,6 +1770,7 @@ class $$NotesTableTableManager extends RootTableManager<
             isPinned: isPinned,
             isArchived: isArchived,
             isDeleted: isDeleted,
+            thumbnailMode: thumbnailMode,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),
@@ -1726,6 +1783,7 @@ class $$NotesTableTableManager extends RootTableManager<
             Value<bool> isPinned = const Value.absent(),
             Value<bool> isArchived = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<bool> thumbnailMode = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
           }) =>
@@ -1738,6 +1796,7 @@ class $$NotesTableTableManager extends RootTableManager<
             isPinned: isPinned,
             isArchived: isArchived,
             isDeleted: isDeleted,
+            thumbnailMode: thumbnailMode,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),

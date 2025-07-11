@@ -282,4 +282,20 @@ class NotesRepository {
   Future<Note> getNoteById(int noteId) {
     return _database.noteDao.getNoteById(noteId);
   }
+
+  /// 更新笔记的缩略图模式
+  Future<int> updateNoteThumbnailMode(int noteId, bool thumbnailMode) async {
+    return await (_database.update(_database.notes)
+      ..where((note) => note.id.equals(noteId)))
+      .write(NotesCompanion(
+        thumbnailMode: Value(thumbnailMode),
+        updatedAt: Value(DateTime.now()),
+      ));
+  }
+  
+  /// 获取笔记的缩略图模式
+  Future<bool> getNoteThumbnailMode(int noteId) async {
+    final note = await _database.noteDao.getNoteById(noteId);
+    return note.thumbnailMode;
+  }
 } 
