@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:record_app/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:record_app/features/home/presentation/pages/home_page.dart';
+import 'package:record_app/features/ai_chat/presentation/pages/ai_chat_content.dart';
+import 'package:record_app/features/ai_chat/presentation/widgets/ai_chat_app_bar.dart';
 import 'package:record_app/features/main_shell/presentation/bloc/main_shell_cubit.dart';
 import 'package:record_app/features/settings/presentation/pages/settings_page.dart';
 import 'package:record_app/features/main_shell/presentation/widgets/bottom_nav_bar.dart';
@@ -51,7 +53,7 @@ class _MainShellPageState extends State<MainShellPage> {
     _pageContents = [
       const HomeContent(),
       const CalendarContent(),
-      const ComingSoonContent(),
+      const AiChatContent(),
       const SettingsContent(),
     ];
   }
@@ -107,10 +109,7 @@ class _MainShellPageState extends State<MainShellPage> {
           ),
         );
       case 2:
-        return AppBar(
-          title: const Text('即将推出'),
-          centerTitle: true,
-        );
+        return const AiChatAppBar();
       case 3:
         return AppBar(
           title: const Text('设置'),
