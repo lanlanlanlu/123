@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
 import '../bloc/ai_chat_bloc.dart';
+import '../bloc/ai_chat_event.dart';
+import '../bloc/ai_chat_state.dart';
 import '../widgets/chat_error_display.dart';
 import 'package:intl/intl.dart';
+import 'package:record_app/data/repository/ai_chat_repository.dart'; 
+import 'package:record_app/features/ai_chat/presentation/pages/ai_chat_page.dart';
 
 /// AI聊天页面
 class AiChatPage extends StatefulWidget {
@@ -13,8 +17,9 @@ class AiChatPage extends StatefulWidget {
   State<AiChatPage> createState() => _AiChatPageState();
 }
 
+
 class _AiChatPageState extends State<AiChatPage> {
-  late final AiChatBloc _aiChatBloc;
+  // late final AiChatBloc _aiChatBloc;
   late final ChatUser _currentUser;
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -22,8 +27,6 @@ class _AiChatPageState extends State<AiChatPage> {
   @override
   void initState() {
     super.initState();
-    _aiChatBloc = AiChatBloc();
-    _aiChatBloc.add(const AiChatInitialized());
     
     // 创建当前用户，实际应用中应从认证服务获取用户信息
     _currentUser = ChatUser(
@@ -35,7 +38,6 @@ class _AiChatPageState extends State<AiChatPage> {
 
   @override
   void dispose() {
-    _aiChatBloc.close();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -50,14 +52,15 @@ class _AiChatPageState extends State<AiChatPage> {
       createdAt: DateTime.now(),
     );
     
-    _aiChatBloc.add(AiChatMessageSent(chatMessage));
+    // 从 context 中读取由 BlocProvider 提供的 BLoC 实例
+    context.read<AiChatBloc>().add(AiChatMessageSent(chatMessage));
     _textController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
-      value: _aiChatBloc,
+      value: context.read<AiChatBloc>(),
       child: BlocConsumer<AiChatBloc, AiChatState>(
         listener: (context, state) {
           // 当有新消息时，滚动到底部
@@ -86,8 +89,8 @@ class _AiChatPageState extends State<AiChatPage> {
                   reverse: true,
                   itemCount: state.messages.length,
                   itemBuilder: (context, index) {
-                    final reversedIndex = state.messages.length - 1 - index;
-                    final message = state.messages[reversedIndex];
+                    // final reversedIndex = state.messages.length - 1 - index;
+                    final message = state.messages.reversed.toList()[index];
                     final isAi = message.user.id == 'ai_assistant';
                     
                     // AI消息

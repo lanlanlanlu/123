@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/ai_chat_bloc.dart';
+import '../bloc/ai_chat_event.dart';
 
 /// AI聊天页面的AppBar
 class AiChatAppBar extends StatelessWidget implements PreferredSizeWidget {

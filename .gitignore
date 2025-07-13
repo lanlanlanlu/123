@@ -51,5 +51,21 @@ app.*.map.json
 CLAUDE.local.md
 CLAUDE.md
 
-*.jpg
-*.png
+
+
+# =================
+# Python Server
+# =================
+
+# 忽略虚拟环境文件夹
+/server/venv/
+
+# 忽略 Python 缓存文件
+/server/__pycache__/
+/server/*.pyc
+
+# 忽略 LlamaIndex 的本地索引
+/server/storage/
+
+# 绝对禁止上传包含密钥的环境变量文件！
+/server/.env
