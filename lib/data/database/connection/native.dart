@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:record_app/data/database/database.dart';
@@ -21,6 +22,8 @@ AppDatabase connect() {
     try {
       final dbFolder = await getApplicationDocumentsDirectory();
       final file = File(p.join(dbFolder.path, 'record.sqlite'));
+
+      Logger().d('Database file path: ${file.path}');
       
       // 使用Drift推荐的方法在后台线程中打开数据库
       return NativeDatabase.createInBackground(file, setup: (db) {
@@ -30,7 +33,7 @@ AppDatabase connect() {
         db.execute('PRAGMA journal_mode = WAL');
       });
     } catch (e) {
-      print('Failed to initialize database: $e');
+      Logger().e('Failed to initialize database: $e');
       // 如果优化方法失败，使用最基本的连接方式
       final dbFolder = await getApplicationDocumentsDirectory();
       final file = File(p.join(dbFolder.path, 'record.sqlite'));
