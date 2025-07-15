@@ -13,7 +13,7 @@ import 'embed_marker.dart';
 import 'package:record_app/core/widgets/context_menu.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
+import 'dart:io' show File, Platform;
 import 'package:path/path.dart' as p;
 
 /// 录音状态
@@ -798,7 +798,20 @@ class _AudioRecordingPlayerWidgetState extends State<AudioRecordingPlayerWidget>
 
   Future<void> _initAudioPlayer() async {
     try {
-      await _audioPlayer.setFilePath(widget.audioPath);
+      // 根据平台处理音频文件路径
+      String normalizedPath = widget.audioPath;
+      if (Platform.isWindows && widget.audioPath.contains('\\')) {
+        normalizedPath = widget.audioPath.replaceAll('\\', '/');
+      }
+      
+      // 尝试使用标准化路径播放
+      try {
+        await _audioPlayer.setFilePath(normalizedPath);
+      } catch (e) {
+        debugPrint('使用标准化路径播放失败，尝试原始路径: $e');
+        // 如果标准化路径失败，尝试使用原始路径
+        await _audioPlayer.setFilePath(widget.audioPath);
+      }
       
       // 监听播放状态
       _audioPlayer.playerStateStream.listen((state) {

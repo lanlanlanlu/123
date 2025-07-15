@@ -21,6 +21,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:record_app/features/note_detail/presentation/widgets/embed_marker.dart';
 import 'package:record_app/core/widgets/context_menu.dart';
+import 'dart:io' show Platform;
 
 /// 基于Flutter Quill的笔记编辑器组件
 class QuillEditorWidget extends StatefulWidget {
@@ -301,19 +302,33 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
     }
   }
   
+  // 添加一个帮助方法来规范化路径，根据不同平台处理
+  String _normalizePath(String path) {
+    if (Platform.isWindows) {
+      // Windows平台路径使用斜杠替换反斜杠
+      return path.replaceAll('\\', '/');
+    } else {
+      // Android和其他平台保持不变
+      return path;
+    }
+  }
+
   // 复制图片并插入到编辑器
   Future<void> _copyImageAndInsertToEditor(XFile imageFile) async {
     final documents = await getApplicationDocumentsDirectory();
     final fileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(imageFile.path)}';
-    final String newPath = '${documents.path}/$fileName';
+    final String newPath = p.join(documents.path, fileName);
 
     // 保存文件
     await imageFile.saveTo(newPath);
 
+    // 根据平台规范化路径
+    final String normalizedPath = _normalizePath(newPath);
+
     // 添加到新图片路径列表（如果父组件需要）
     if (widget.onDeleteImage != null) {
       context.read<NoteDetailBloc>().add(NoteDetailUpdateImages(
-        newImagePaths: [newPath],
+        newImagePaths: [normalizedPath],
         deletedImagePaths: [],
       ));
     }
@@ -325,7 +340,7 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
       final offset = isSelectionValid ? index : _controller.document.length;
       
       // 使用Quill的图片嵌入格式
-      _controller.document.insert(offset, BlockEmbed.image(newPath));
+      _controller.document.insert(offset, BlockEmbed.image(normalizedPath));
       
       // 确保图片后有换行符
       if (offset < _controller.document.length - 1 && 
@@ -336,7 +351,7 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
       debugPrint('插入图片失败: $e');
       // 在发生错误时回退到添加到末尾
       try {
-        _controller.document.insert(_controller.document.length, BlockEmbed.image(newPath));
+        _controller.document.insert(_controller.document.length, BlockEmbed.image(normalizedPath));
         _controller.document.insert(_controller.document.length, '\n');
       } catch (e2) {
         debugPrint('回退插入图片也失败: $e2');
@@ -348,14 +363,17 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
   Future<void> _copyVideoAndInsertToEditor(XFile videoFile) async {
     final documents = await getApplicationDocumentsDirectory();
     final fileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(videoFile.path)}';
-    final String newPath = '${documents.path}/$fileName';
+    final String newPath = p.join(documents.path, fileName);
     await videoFile.saveTo(newPath);
+
+    // 根据平台规范化路径
+    final String normalizedPath = _normalizePath(newPath);
 
     try {
       final index = _controller.selection.baseOffset;
       final isSelectionValid = index >= 0 && index < _controller.document.length;
       final offset = isSelectionValid ? index : _controller.document.length;
-      _controller.document.insert(offset, BlockEmbed.video(newPath));
+      _controller.document.insert(offset, BlockEmbed.video(normalizedPath));
       if (offset < _controller.document.length - 1 &&
           _controller.document.getPlainText(offset + 1, offset + 2) != '\n') {
         _controller.document.insert(offset + 1, '\n');
@@ -363,7 +381,7 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
     } catch (e) {
       debugPrint('插入视频失败: $e');
       try {
-        _controller.document.insert(_controller.document.length, BlockEmbed.video(newPath));
+        _controller.document.insert(_controller.document.length, BlockEmbed.video(normalizedPath));
         _controller.document.insert(_controller.document.length, '\n');
       } catch (e2) {
         debugPrint('回退插入视频也失败: $e2');
@@ -500,14 +518,12 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
                     child: Listener(
                       behavior: HitTestBehavior.translucent,
                       onPointerDown: (event) {
-                        // 记录触摸起始位置
-                        if (event.kind == PointerDeviceKind.touch) {
-                          _touchStartPosition = event.position;
-                        }
+                        // 记录触摸或鼠标起始位置，移除对PointerDeviceKind.touch的限制
+                        _touchStartPosition = event.position;
                       },
                       onPointerUp: (event) {
-                        // 只在起始位置记录存在时处理
-                        if (event.kind == PointerDeviceKind.touch && _touchStartPosition != null) {
+                        // 只在起始位置记录存在时处理，移除对PointerDeviceKind.touch的限制
+                        if (_touchStartPosition != null) {
                           // 计算总移动距离
                           final distance = (_touchStartPosition! - event.position).distance;
                           // 清除起始位置
@@ -751,17 +767,51 @@ class CustomImageEmbedBuilder extends EmbedBuilder {
             Container(
               constraints: imageConstraints,
               margin: const EdgeInsets.only(right: 8.0, bottom: 8.0),
-              child: Image.file(
-                File(imageUrl),
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: isThumbnailMode ? 100 : 200,
-                    height: isThumbnailMode ? 50 : 100,
-                    color: Colors.grey[300],
-                    child: const Center(child: Text('图片加载失败')),
+              child: Builder(
+                builder: (context) {
+                  // 找到父级QuillEditorWidget状态，使用其规范化路径方法
+                  String path = imageUrl;
+                  try {
+                    if (Platform.isWindows && imageUrl.contains('\\')) {
+                      path = imageUrl.replaceAll('\\', '/');
+                    }
+                  } catch (e) {
+                    // 忽略平台检测错误，使用原始路径
+                  }
+                  
+                  return Image.file(
+                    File(path),
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      // 如果加载失败，尝试备用方法
+                      try {
+                        if (Platform.isWindows) {
+                          // 如果是Windows平台上的特殊路径问题，试着用另一种方式处理
+                          final alternativePath = imageUrl.replaceAll('/', '\\');
+                          return Image.file(
+                            File(alternativePath),
+                            fit: BoxFit.contain,
+                            errorBuilder: (ctx, err, st) => Container(
+                              width: isThumbnailMode ? 100 : 200,
+                              height: isThumbnailMode ? 50 : 100,
+                              color: Colors.grey[300],
+                              child: Center(child: Text('图片加载失败')),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        // 忽略备用方法错误
+                      }
+                      
+                      return Container(
+                        width: isThumbnailMode ? 100 : 200,
+                        height: isThumbnailMode ? 50 : 100,
+                        color: Colors.grey[300],
+                        child: Center(child: Text('图片加载失败')),
+                      );
+                    },
                   );
-                },
+                }
               ),
             ),
           ],
@@ -965,8 +1015,32 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.file(File(widget.videoPath));
-    _initFuture = _controller.initialize();
+    // 根据平台规范化路径
+    String path = widget.videoPath;
+    try {
+      if (Platform.isWindows && path.contains('\\')) {
+        path = path.replaceAll('\\', '/');
+      }
+    } catch (e) {
+      debugPrint('平台检测错误: $e');
+    }
+    
+    _controller = VideoPlayerController.file(File(path));
+    _initFuture = _controller.initialize().catchError((error) {
+      debugPrint('视频初始化错误: $error');
+      // 如果初始化失败，尝试另一种路径格式（Windows专用）
+      if (Platform.isWindows) {
+        try {
+          final alternativePath = widget.videoPath.replaceAll('/', '\\');
+          _controller = VideoPlayerController.file(File(alternativePath));
+          return _controller.initialize();
+        } catch (e) {
+          debugPrint('备用视频初始化也失败: $e');
+          return Future.error(error);
+        }
+      }
+      return Future.error(error);
+    });
   }
 
   @override
