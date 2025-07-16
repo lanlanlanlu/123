@@ -108,3 +108,13 @@ watchfiles==1.1.0
 websockets==15.0.1
 wrapt==1.17.2
 yarl==1.20.1
+
+# 【新增】BM25检索相关依赖
+llama-index-retrievers-bm25==0.1.3
+rank-bm25==0.2.2
+nltk==3.9.1
+PyStemmer==2.2.0.1
+
+# 【新增】地理编码相关依赖
+googlemaps==4.10.0
+geopy==2.3.0

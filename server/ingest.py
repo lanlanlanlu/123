@@ -8,6 +8,8 @@ from datetime import datetime  # 添加 datetime 导入
 
 # 导入工具类
 from utils.date_utils import convert_timestamp_to_date_str
+# 导入地理编码工具
+from utils.geocoding import enhance_location_metadata
 
 # 我们只从核心包导入，不再需要任何深层次的、容易变动的导入
 from llama_index.core import (
@@ -145,6 +147,20 @@ def load_notes_from_db() -> list[Document]:
             # **调用已定义的函数**
             tags_list = process_concatenated_field(note_dict['tags'])
             locations_list = process_concatenated_field(note_dict['locations'])
+            
+            # 【新增】使用地理编码API增强地点信息
+            if locations_list:
+                try:
+                    enhanced_locations = enhance_location_metadata(locations_list)
+                    # 更新地点列表，包含原始地点和变体
+                    locations_list = enhanced_locations["variants"]
+                    # 添加地点层级关系
+                    location_hierarchy = enhanced_locations["hierarchy"]
+                except Exception as e:
+                    print(f"增强地点信息失败: {e}")
+                    location_hierarchy = []
+            else:
+                location_hierarchy = []
                     
             plain_text_content = convert_delta_to_plain_text(note_dict['content'])
             
@@ -164,6 +180,7 @@ def load_notes_from_db() -> list[Document]:
                     "creation_date": creation_date, # 使用新的转换函数处理时间戳
                     "tags": tags_list,
                     "locations": locations_list,
+                    "location_hierarchy": location_hierarchy,  # 【新增】添加地点层级关系
                     "mentioned_dates": mentioned_dates_list,
                 }
             )
