@@ -118,3 +118,6 @@ PyStemmer==2.2.0.1
 # 【新增】地理编码相关依赖
 googlemaps==4.10.0
 geopy==2.3.0
+
+
+llama-index-postprocessor-cohere-rerank==0.1.3

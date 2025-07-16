@@ -4,7 +4,7 @@
 
 ## 功能概述
 
-混合搜索结合了两种不同的检索方式：
+混合搜索结合了多种检索方式：
 
 1. **向量检索 (Vector Search)**: 使用文本嵌入模型将文本转换为高维向量，通过计算查询与文档向量之间的相似度进行检索。
    - 优点：能够捕捉语义相似性，处理同义词和上下文关联性
@@ -16,7 +16,12 @@
 
 3. **混合检索 (Hybrid Search)**: 结合上述两种方法，获得两者的优势。
 
-4. **地理编码增强**: 使用Google Maps API进行地点标准化和模糊匹配。
+4. **重排序 (Reranking)**: 使用Cohere Rerank对检索结果进行重新排序，提升相关性。
+   - 优点：通过专门的模型对初始检索结果进行精细排序，大幅提升检索质量
+   - 优点：比LLM重排序更快、成本更低
+   - 缺点：需要额外的API调用
+
+5. **地理编码增强**: 使用Google Maps API进行地点标准化和模糊匹配。
    - 优点：解决地点名称变体问题（如"香港"与"香港市"）
    - 优点：支持地点层级关系匹配（如查询"北京"可匹配"朝阳区"）
 
@@ -28,9 +33,22 @@
 
 ```json
 {
-  "query": "你的查询内容"
+  "query": "你的查询内容",
+  "search_mode": "hybrid",
+  "use_rerank": true,
+  "rerank_mode": "cohere"
 }
 ```
+
+参数说明：
+- `query`: 用户查询文本 (必填)
+- `search_mode`: 搜索模式，可选值：
+  - `default`: 仅使用向量检索
+  - `bm25`: 仅使用BM25检索
+  - `hybrid`: 混合检索 (默认)
+- `use_rerank`: 是否使用重排序，true/false
+- `rerank_mode`: 重排序模式，可选值：
+  - `cohere`: 使用Cohere Rerank (默认)
 
 响应格式：
 
@@ -49,6 +67,7 @@
 - PyStemmer 和 NLTK: 用于文本处理和分词
 - Google Gemini: 提供嵌入和LLM功能
 - Google Maps API: 提供地理编码功能
+- Cohere: 提供重排序功能
 
 ### 核心组件
 
@@ -56,6 +75,9 @@
    - `VectorIndexRetriever`: 基于向量相似度的检索
    - `BM25Retriever`: 基于关键词匹配的检索
    - `QueryFusionRetriever`: 融合上述两种检索结果
+
+2. **重排序器**:
+   - `CohereRerank`: 使用Cohere API进行检索结果重排序
 
 2. **元数据过滤**:
    - 支持基于标签、位置和日期的过滤

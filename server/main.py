@@ -36,12 +36,21 @@ from llama_index.retrievers.bm25 import BM25Retriever
 from llama_index.core.retrievers import QueryFusionRetriever, VectorIndexRetriever
 from llama_index.core.vector_stores.types import VectorStoreQueryMode
 
+# 引入Cohere Rerank
+import cohere
+from llama_index.postprocessor.cohere_rerank import CohereRerank
+
 # --- 配置与初始化 ---
 PERSIST_DIR = "./storage"
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
 if not api_key:
     raise ValueError("GOOGLE_API_KEY 环境变量未设置！")
+
+# 获取Cohere API密钥
+cohere_api_key = os.getenv("COHERE_API_KEY")
+if not cohere_api_key:
+    print("警告: COHERE_API_KEY 环境变量未设置，Cohere Rerank功能将不可用")
 
 llm = GoogleGenAI(
     model="gemini-1.5-flash",
@@ -191,12 +200,16 @@ def startup_event():
 
 class ChatRequest(BaseModel):
     query: str
+    use_rerank: bool = True       # 是否在检索后使用重排序
+    rerank_language: str = "auto"  # 重排序语言: auto, english, multilingual
 
 # --- API 端点 ---
 @app.post("/api/chat")
 async def handle_chat_request(request: ChatRequest):
     """
-    处理聊天请求，使用混合搜索（向量+BM25）
+    处理聊天请求，使用混合搜索模式并支持重排序:
+    - use_rerank: 是否对检索结果进行重排序
+    - rerank_language: 重排序使用的语言模型，可选 auto, english, multilingual
     """
     if index is None:
         raise HTTPException(status_code=503, detail="服务不可用：索引未初始化。")
@@ -212,35 +225,84 @@ async def handle_chat_request(request: ChatRequest):
     # 2. 根据实体构建元数据过滤器
     metadata_filters = build_metadata_filters(entities)
     
-    # 3. 创建混合检索引擎
+    # 3. 创建检索引擎
     qa_template = PromptTemplate(QA_TEMPLATE_STR)
     
-    # 混合检索模式：BM25 + 向量检索
+    # 准备节点后处理器列表
+    node_postprocessors = []
+    retriever = None
+    
+    # 获取实际文档总数
+    doc_count = len(index.docstore.docs) if hasattr(index, "docstore") and hasattr(index.docstore, "docs") else 0
+    
+    # 确定检索数量
+    if request.use_rerank:
+        # 重排序时尽量检索20个文档，但不超过实际文档数
+        top_k = min(20, doc_count) if doc_count > 0 else 5
+        print(f"将使用重排序，初始检索数量设置为{top_k}（总文档数：{doc_count}）")
+    else:
+        # 不使用重排序时检索5个文档
+        top_k = min(5, doc_count) if doc_count > 0 else 5
+    
+    # 使用混合检索模式
     print("使用混合检索模式（Hybrid Search）")
+    
     # 创建向量检索器
     vector_retriever = VectorIndexRetriever(
         index=index, 
-        similarity_top_k=5,
+        similarity_top_k=top_k,
         filters=metadata_filters,
     )
     
     # 创建BM25检索器
     bm25_retriever = BM25Retriever.from_defaults(
         docstore=index.docstore,
-        similarity_top_k=5
+        similarity_top_k=top_k
     )
     
     # 创建融合检索器
     retriever = QueryFusionRetriever(
         retrievers=[vector_retriever, bm25_retriever],
-        similarity_top_k=3,
+        similarity_top_k=top_k,
         num_queries=1,
     )
     
-    # 创建查询引擎
+    # 如果启用了重排序，添加重排序处理器
+    if request.use_rerank and cohere_api_key:
+        # 根据语言选择适当的模型
+        model = "rerank-english-v3.0"  # 默认英文模型
+        
+        # 多语言模型处理
+        if request.rerank_language == "multilingual":
+            model = "rerank-multilingual-v3.0"  # 多语言模型
+            print(f"使用Cohere多语言重排序器 (模型: {model})")
+        elif request.rerank_language == "english":
+            print(f"使用Cohere英文重排序器 (模型: {model})")
+        else:  # auto
+            # 自动检测查询语言
+            has_chinese = any('\u4e00' <= char <= '\u9fff' for char in request.query)
+            if has_chinese:
+                # 对于中文查询使用多语言模型
+                model = "rerank-multilingual-v3.0"
+                print(f"检测到中文查询，使用Cohere多语言重排序器 (模型: {model})")
+            else:
+                print(f"使用Cohere英文重排序器 (模型: {model})")
+                
+        # 创建Cohere重排序器
+        reranker = CohereRerank(
+            api_key=cohere_api_key,
+            model=model,
+            top_n=5  # 重排序后保留的文档数量
+        )
+        node_postprocessors.append(reranker)
+    elif request.use_rerank and not cohere_api_key:
+        print("警告：Cohere API密钥未设置，跳过重排序")
+    
+    # 创建查询引擎，加入后处理器
     query_engine = RetrieverQueryEngine.from_args(
         retriever=retriever,
         text_qa_template=qa_template,
+        node_postprocessors=node_postprocessors,
         llm=Settings.llm,
         streaming=False  # 明确指定不使用流式响应
     )
@@ -252,24 +314,61 @@ async def handle_chat_request(request: ChatRequest):
         clean_query = request.query
 
     print(f"发送给AI的清理后查询: {clean_query}")
-    response = query_engine.query(clean_query)
     
-    # 打印检索到的上下文
-    print(f"\n--- 检索到的上下文 ({len(response.source_nodes)} 条) ---")
-    if not response.source_nodes:
-        print("未能检索到任何相关上下文。")
-    else:
-        for i, node in enumerate(response.source_nodes):
-            print(f"【上下文 {i+1}】 (相似度: {node.score:.4f})")
-            print(f"来源笔记ID: {node.metadata.get('note_id', 'N/A')}, 标题: {node.metadata.get('title', 'N/A')}")
-            print(f"元数据: {node.metadata}")  # 打印所有元数据以供调试
-            print(f"内容片段:\n---\n{node.get_content()}\n---")
-    print(f"{'='*50}\n")
-    
-    # 获取响应文本
-    full_response_text = response.response
-    print(f"生成的回答: {full_response_text}")
-    return {"response": full_response_text}
+    try:
+        # 添加异常处理，确保任何查询错误都能被正确处理
+        response = query_engine.query(clean_query)
+        
+        # 打印检索到的上下文
+        print(f"\n--- 检索到的上下文 ({len(response.source_nodes)} 条) ---")
+        if not response.source_nodes:
+            print("未能检索到任何相关上下文。")
+        else:
+            for i, node in enumerate(response.source_nodes):
+                print(f"【上下文 {i+1}】 (相似度: {node.score:.4f})")
+                print(f"来源笔记ID: {node.metadata.get('note_id', 'N/A')}, 标题: {node.metadata.get('title', 'N/A')}")
+                print(f"元数据: {node.metadata}")  # 打印所有元数据以供调试
+                print(f"内容片段:\n---\n{node.get_content()}\n---")
+        print(f"{'='*50}\n")
+        
+        # 获取响应文本
+        full_response_text = response.response
+        print(f"生成的回答: {full_response_text}")
+        return {"response": full_response_text}
+        
+    except ValueError as e:
+        # 捕获值错误，如文档数量不足的错误
+        print(f"查询引擎错误: {str(e)}")
+        error_message = "抱歉，处理您的查询时出现了技术问题。"
+        if "larger than the number of available scores" in str(e):
+            error_message = "抱歉，数据库中的文档数量不足以执行当前的检索操作。请稍后再试或使用标准向量搜索模式。"
+        return {"response": error_message, "error": str(e)}
+    except Exception as e:
+        # 捕获所有其他异常
+        error_str = str(e)
+        print(f"未预期的错误: {error_str}")
+        
+        # 处理Cohere API特定错误
+        if "model " in error_str and "not found" in error_str or "cohere" in error_str.lower():
+            # Cohere模型相关错误，回退到不使用重排序
+            print("Cohere API错误，回退到不使用重排序")
+            # 创建不使用重排序的查询引擎
+            fallback_query_engine = RetrieverQueryEngine.from_args(
+                retriever=retriever,
+                text_qa_template=qa_template,
+                node_postprocessors=[], # 不使用后处理器
+                llm=Settings.llm,
+                streaming=False
+            )
+            try:
+                # 尝试使用回退查询引擎
+                response = fallback_query_engine.query(clean_query)
+                print("成功使用回退查询引擎（无重排序）")
+                return {"response": str(response.response)}
+            except Exception as fallback_error:
+                print(f"回退查询也失败: {str(fallback_error)}")
+        
+        return {"response": f"抱歉，处理您的查询时出现了问题。请稍后再试。", "error": error_str}
 
 @app.get("/")
 def health_check():
