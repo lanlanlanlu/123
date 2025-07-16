@@ -32,8 +32,8 @@ PERSIST_DIR = "./storage"
 DB_PATH = "D:\\am4yne\\Documents\\record.sqlite" 
 
 # --- 切分参数配置 ---
-CHUNK_SIZE = 384
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = 512
+CHUNK_OVERLAP = 20
 
 # --- 辅助函数 ---
 
@@ -57,7 +57,11 @@ def convert_delta_to_plain_text(delta_json_string: str) -> str:
             if isinstance(op['insert'], str):
                 text_parts.append(op['insert'])
             # 也可以处理图片等其他嵌入类型，但这里我们只关心文本
-    return "".join(text_parts).strip()
+    
+    result = "".join(text_parts).strip()
+    
+    
+    return result
 
 def extract_mentioned_dates(text: str) -> list[str]:
     """

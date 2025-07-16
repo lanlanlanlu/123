@@ -67,7 +67,9 @@ QA_TEMPLATE_STR = (
     "---------------------\n"
     "{context_str}\n"
     "---------------------\n"
-    "你是一个专业的个人笔记助手。请只根据上面提供的上下文信息，来回答这个问题。如果上下文信息与问题无关，请回答“根据您的笔记内容，我无法回答这个问题。“\n"
+    "你是一个专业的个人笔记助手。请只根据上面提供的上下文信息，来回答这个问题。"
+    "如果上下文信息与问题无关，请回答“根据您的笔记内容，我无法回答这个问题。”\n"
+    "如果用户要求按照特定方式组织回答（如分点、总结等），请务必按照要求组织你的回答。\n"
     "问题: {query_str}\n"
 )
 
@@ -129,20 +131,24 @@ def build_metadata_filters(entities: dict) -> MetadataFilters | None:
         ]
         all_filters.extend(tag_filters)
 
-    # 为 "locations" 创建过滤器，支持变体和层级关系
+    # 为 "locations" 创建过滤器，优先使用精确地点匹配
+    location_filters = []
     if entities.get("locations"):
         # 添加所有地点变体的过滤器
         for location in entities["locations"]:
-            all_filters.append(
+            location_filters.append(
                 MetadataFilter(key="locations", operator=FilterOperator.CONTAINS, value=location)
             )
     
-    # 添加地点层级关系的过滤器
-    if entities.get("location_hierarchy"):
+    # 只有在没有具体地点匹配时才使用层级关系
+    if not location_filters and entities.get("location_hierarchy"):
         for level in entities["location_hierarchy"]:
-            all_filters.append(
+            location_filters.append(
                 MetadataFilter(key="location_hierarchy", operator=FilterOperator.CONTAINS, value=level)
             )
+    
+    if location_filters:
+        all_filters.extend(location_filters)
 
     # 为 "dates" 创建过滤器
     if entities.get("dates"):
@@ -227,8 +233,8 @@ async def handle_chat_request(request: ChatRequest):
     # 创建融合检索器
     retriever = QueryFusionRetriever(
         retrievers=[vector_retriever, bm25_retriever],
-        # similarity_top_k=3,
-        num_queries=3, 
+        similarity_top_k=3,
+        num_queries=1,
     )
     
     # 创建查询引擎
