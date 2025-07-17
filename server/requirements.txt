@@ -63,9 +63,9 @@ marshmallow==3.26.1
 multidict==6.6.3
 mypy_extensions==1.1.0
 nest-asyncio==1.6.0
-networkx==3.5
+networkx==3.4.0
 nltk==3.9.1
-numpy==2.3.1
+numpy==1.26.4
 openai==1.95.1
 packaging==25.0
 pandas==2.2.3
@@ -112,12 +112,17 @@ yarl==1.20.1
 # 【新增】BM25检索相关依赖
 llama-index-retrievers-bm25==0.1.3
 rank-bm25==0.2.2
-nltk==3.9.1
 PyStemmer==2.2.0.1
 
 # 【新增】地理编码相关依赖
 googlemaps==4.10.0
 geopy==2.3.0
 
+# 【新增】重排序相关依赖
+llama-index-postprocessor-cohere-rerank==0.4.0
+cohere==4.39
 
-llama-index-postprocessor-cohere-rerank==0.1.3
+# 【新增】图谱存储和图检索相关依赖
+neo4j==5.14.1
+llama-index-graph-stores-neo4j==0.1.3
+llama-index-indices-knowledge-graph==0.1.2

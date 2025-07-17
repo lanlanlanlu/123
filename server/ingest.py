@@ -10,6 +10,9 @@ from datetime import datetime  # 添加 datetime 导入
 from utils.date_utils import convert_timestamp_to_date_str
 # 导入地理编码工具
 from utils.geocoding import enhance_location_metadata
+# 导入实体提取器和图谱构建器
+from utils.entity_extractor import extract_entities_from_text, batch_extract_entities
+from utils.graph_builder import PropertyGraphBuilder
 
 # 我们只从核心包导入，不再需要任何深层次的、容易变动的导入
 from llama_index.core import (
@@ -105,6 +108,7 @@ def process_concatenated_field(field_value: str | int | None) -> list[str]:
 def load_notes_from_db() -> list[Document]:
     """
     【重大改造】从数据库加载笔记，并通过JOIN一次性获取所有关联的标签和地点。
+    同时提取文本实体，构建属性图谱
     """
     if not DB_PATH or "在这里粘贴" in DB_PATH:
         raise ValueError("错误: DB_PATH 未设置！")
@@ -143,16 +147,29 @@ def load_notes_from_db() -> list[Document]:
         conn.close()
         
         print(f"成功从数据库查询到 {len(notes_raw)} 条笔记及其元数据。")
+        
+        # 初始化图谱构建器
+        graph_builder = PropertyGraphBuilder()
+        # 清空现有图谱数据（慎用，仅在开发阶段或完全重建时启用）
+        if graph_builder.connected:
+            graph_builder.clear_graph()
+        
+        # 处理笔记文本，准备实体提取
+        all_texts = []
         documents = []
+        
+        # 第一遍循环，准备文本和基本文档
+        print("正在准备文档和提取基本元数据...")
         for note_row in notes_raw:
             # 将数据库行转换为字典
             note_dict = dict(note_row)
 
-            # **调用已定义的函数**
+            # 处理基本元数据
             tags_list = process_concatenated_field(note_dict['tags'])
             locations_list = process_concatenated_field(note_dict['locations'])
             
             # 【新增】使用地理编码API增强地点信息
+            enhanced_locations = {}
             if locations_list:
                 try:
                     enhanced_locations = enhance_location_metadata(locations_list)
@@ -166,29 +183,76 @@ def load_notes_from_db() -> list[Document]:
             else:
                 location_hierarchy = []
                     
+            # 转换笔记内容
             plain_text_content = convert_delta_to_plain_text(note_dict['content'])
             
             # 组合标题和内容，让AI知道它们的上下文关系
             text_for_embedding = f"笔记标题: {note_dict['title']}\n\n{plain_text_content}"
+            all_texts.append(text_for_embedding)
+            
             # 3. 提取内容中提及的日期
             mentioned_dates_list = extract_mentioned_dates(plain_text_content)
 
             # 处理创建时间，正确转换 Unix 时间戳
             creation_date = convert_timestamp_to_date_str(note_dict['created_at'])
 
+            # 创建文档和基本元数据
             doc = Document(
                 text=text_for_embedding,
                 metadata={
                     "note_id": str(note_dict['id']), # 确保为字符串
                     "title": note_dict['title'],
                     "creation_date": creation_date, # 使用新的转换函数处理时间戳
+                    "created_at": note_dict['created_at'],  # 保留原始时间戳
                     "tags": tags_list,
                     "locations": locations_list,
                     "location_hierarchy": location_hierarchy,  # 【新增】添加地点层级关系
                     "mentioned_dates": mentioned_dates_list,
+                    # 实体和关系字段将在后面填充
+                    "people": [],
+                    "organizations": [],
+                    "concepts": [],
+                    "relations": []
                 }
             )
             documents.append(doc)
+        
+        # 批量提取实体和关系
+        print("正在批量提取实体和关系...")
+        batch_size = 5  # 每批处理的笔记数量
+        entity_results = batch_extract_entities(all_texts, llm=Settings.llm, batch_size=batch_size)
+        
+        # 第二遍循环，填充实体和关系，并构建图谱
+        print("正在构建图谱...")
+        for i, doc in enumerate(documents):
+            # 如果提取成功，更新文档元数据
+            if i < len(entity_results):
+                # 更新文档元数据
+                doc.metadata["people"] = entity_results[i].get("people", [])
+                doc.metadata["organizations"] = entity_results[i].get("organizations", [])
+                doc.metadata["concepts"] = entity_results[i].get("concepts", [])
+                doc.metadata["relations"] = entity_results[i].get("relations", [])
+            
+            # 添加到图谱
+            if graph_builder.connected:
+                # 获取笔记基本信息和实体信息
+                note_data = {
+                    "id": doc.metadata["note_id"],
+                    "title": doc.metadata["title"],
+                    "creation_date": doc.metadata["creation_date"],
+                    "created_at": doc.metadata["created_at"]
+                }
+                
+                # 添加到图谱
+                graph_builder.add_note(note_data, doc.metadata)
+        
+        # 关闭图谱构建器连接
+        if graph_builder.connected:
+            # 显示图谱统计信息
+            node_counts = graph_builder.get_node_count()
+            relation_counts = graph_builder.get_relation_count()
+            print(f"图谱构建完成。节点数量: {node_counts}, 关系数量: {relation_counts}")
+            graph_builder.close()
             
         print(f"成功将 {len(documents)} 条笔记转换为包含丰富元数据的可处理文档。")
         return documents

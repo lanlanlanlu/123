@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-dotenv
+googlemaps
+geopy
+numpy
+pandas
+llama-index==0.10.14
+google-generativeai
+llama-index-embeddings-google
+neo4j
+python-dateutil
+pydantic
