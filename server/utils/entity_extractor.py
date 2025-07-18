@@ -16,7 +16,7 @@ from utils.geocoding import extract_locations_from_text, enhance_location_metada
 def extract_entities_from_text(text: str, llm=None) -> Dict[str, Any]:
     """
     从文本中提取多种实体和关系
-    优先使用LLM进行提取，如果失败则回退到基本方法
+    
     
     参数:
         text: 输入文本
@@ -38,9 +38,17 @@ def extract_entities_from_text(text: str, llm=None) -> Dict[str, Any]:
     if llm:
         try:
             prompt = f"""
-            从以下文本中提取实体和关系信息，以JSON格式返回：
+            你是一个提取Graph RAG的实体和关系信息专家，从以下文本中提取实体和关系信息，以JSON格式返回：
             
             {text}
+            
+            请提取以下类型的实体：
+            1. 地点：如城市、国家、地区、景点等地理位置
+            2. 人物：任何人名、职位后的人名等
+            3. 组织：如公司、学校、机构等
+            4. 概念：如技术、理论、方法、产品等
+            
+            并识别实体间的关系，如"工作于"、"位于"、"研发"、"使用"等。
             
             返回格式 (严格按照以下JSON格式返回，不要添加任何其他内容):
             {{
@@ -83,30 +91,11 @@ def extract_entities_from_text(text: str, llm=None) -> Dict[str, Any]:
                     return result
             except json.JSONDecodeError as e:
                 print(f"无法解析LLM响应: {e}")
-                print(f"原始响应: {response_text}")
-                print(f"处理后的JSON字符串: {json_str}")
+                print(f"原始响应: {response_text[:100]}...")
+                print(f"处理后的JSON字符串: {json_str[:100]}...")
         except Exception as e:
             print(f"LLM实体提取失败: {e}")
     
-    # 如果LLM提取失败，使用现有函数提取地点
-    try:
-        locations = extract_locations_from_text(text, llm=llm)
-        if locations:
-            result["locations"] = locations
-    except Exception as e:
-        print(f"提取地点失败: {e}")
-    
-    # 使用正则表达式提取一些基本实体
-    
-    # 1. 提取可能的人名 (简单匹配，准确性有限)
-    people_pattern = r'(?:先生|女士|老师|教授|博士|医生|律师|总裁|经理)(?:\s*)([a-zA-Z\u4e00-\u9fa5]{2,20})'
-    people = re.findall(people_pattern, text)
-    result["people"] = list(set(people))
-    
-    # 2. 提取可能的组织名称 (简单匹配)
-    org_pattern = r'(?:公司|企业|集团|学校|大学|机构|组织|部门|协会|中心)(?:\s*)([a-zA-Z\u4e00-\u9fa5]{2,30})'
-    orgs = re.findall(org_pattern, text)
-    result["organizations"] = list(set(orgs))
     
     return result
 
@@ -192,25 +181,20 @@ def extract_entities_from_query(query: str, llm=None) -> Dict[str, Any]:
     print(f"提取到的实体: {entities}")
     return entities
 
-def batch_extract_entities(texts: List[str], llm=None, batch_size=5) -> List[Dict[str, Any]]:
+def batch_extract_entities(texts: List[str], llm=None, batch_size=2) -> List[Dict[str, Any]]:
     """
     批量处理多个文本的实体提取，减少LLM API调用次数
     
     参数:
         texts: 文本列表
         llm: LLM模型
-        batch_size: 批处理大小
+        batch_size: 批处理大小，默认为2（降低了默认值以提高稳定性）
         
     返回:
         提取结果列表
     """
     results = []
     
-    if not llm:
-        # 如果没有LLM，单独处理每个文本
-        for text in texts:
-            results.append(extract_entities_from_text(text))
-        return results
     
     # 批处理
     for i in range(0, len(texts), batch_size):
@@ -220,15 +204,15 @@ def batch_extract_entities(texts: List[str], llm=None, batch_size=5) -> List[Dic
         batch_texts = []
         for j, text in enumerate(batch):
             # 截取文本以避免过长
-            short_text = text[:1500] + "..." if len(text) > 1500 else text
+            short_text = text[:1000] + "..." if len(text) > 1000 else text
             batch_texts.append(f"文本[{j+1}]：\n{short_text}\n---")
         
         prompt = f"""
-        分析以下{len(batch)}段文本，提取每段文本中的实体和关系：
+        你是一个提取Graph RAG的实体和关系信息专家，分析以下{len(batch)}段文本，提取每段文本中的实体和关系。
         
         {"".join(batch_texts)}
         
-        返回格式 (JSON):
+        仅返回以下格式的JSON数组，不要添加任何其他解释或注释：
         [
           {{
             "doc_id": 1,
@@ -242,30 +226,56 @@ def batch_extract_entities(texts: List[str], llm=None, batch_size=5) -> List[Dic
               {{"head": "实体1", "relation": "关系类型", "tail": "实体2"}}
             ]
           }},
-          ...
+          // 对每个文本重复上述结构
         ]
         """
         
         try:
+            print(f"批量处理 {len(batch)} 个文本，范围: {i+1}-{i+len(batch)}/{len(texts)}")
             response = llm.complete(prompt)
-            batch_results = json.loads(response.text)
+            response_text = response.text.strip()
             
-            # 处理批处理结果
-            for j in range(len(batch)):
-                if j < len(batch_results):
-                    doc_result = batch_results[j]
-                    # 格式化结果以匹配单个文档的格式
-                    entity_result = doc_result.get("entities", {})
-                    entity_result["relations"] = doc_result.get("relations", [])
-                    results.append(entity_result)
-                else:
-                    # 如果LLM未返回足够的结果，使用回退方法
-                    results.append(extract_entities_from_text(batch[j]))
+            # 清理LLM响应文本，提取JSON部分
+            json_str = response_text
+            
+            # 移除可能的Markdown代码块标记
+            if "```json" in json_str:
+                json_str = json_str.split("```json", 1)[1]
+            elif "```" in json_str:
+                json_str = json_str.split("```", 1)[1]
+            
+            if "```" in json_str:
+                json_str = json_str.split("```", 1)[0]
+            
+            # 寻找JSON数组的起始和结束位置
+            start_idx = json_str.find('[')
+            end_idx = json_str.rfind(']')
+            
+            if start_idx >= 0 and end_idx > start_idx:
+                json_str = json_str[start_idx:end_idx+1]
+                try:
+                    batch_results = json.loads(json_str)
+                    print(f"成功解析批量结果，包含 {len(batch_results)} 条记录")
+                    
+                    # 处理批处理结果
+                    for j in range(len(batch)):
+                        if j < len(batch_results):
+                            doc_result = batch_results[j]
+                            # 格式化结果以匹配单个文档的格式
+                            entity_result = doc_result.get("entities", {})
+                            entity_result["relations"] = doc_result.get("relations", [])
+                            results.append(entity_result)
+                        else:
+                            # 如果LLM未返回足够的结果，使用回退方法
+                            print(f"LLM未返回文本[{j+1}]的结果")
+                except json.JSONDecodeError as e:
+                    print(f"JSON解析错误: {e}")
+                    print(f"处理后的JSON字符串: {json_str[:100]}...")
+            else:
+                print(f"无法在响应中找到有效的JSON数组")
                     
         except Exception as e:
             print(f"批量提取实体失败: {e}")
-            # 回退到逐个处理
-            for text in batch:
-                results.append(extract_entities_from_text(text))
     
+    print(f"总共处理了 {len(texts)} 个文本，提取了 {len(results)} 个结果")
     return results 

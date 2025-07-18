@@ -195,11 +195,11 @@ def startup_event():
             try:
                 # 尝试连接Neo4j
                 print("【Neo4j】尝试创建Neo4jGraphStore...")
-            graph_store = Neo4jGraphStore(
-                username=NEO4J_USER,
-                password=NEO4J_PASSWORD,
-                url=NEO4J_URI
-            )
+                graph_store = Neo4jGraphStore(
+                    username=NEO4J_USER,
+                    password=NEO4J_PASSWORD,
+                    url=NEO4J_URI
+                )
                 print("【Neo4j】Neo4jGraphStore创建成功")
                 
                 # 测试连接
@@ -219,14 +219,14 @@ def startup_event():
                     print(f"【Neo4j错误】连接测试失败: {e}")
                     raise
             
-            # 创建图谱索引
+                # 创建图谱索引
                 print("【Neo4j】创建KnowledgeGraphIndex...")
-            kg_index = KnowledgeGraphIndex.from_documents(
-                [],  # 不需要文档，数据已在Neo4j中
-                graph_store=graph_store,
-                include_embeddings=True,
-                max_triplets_per_chunk=10,
-            )
+                kg_index = KnowledgeGraphIndex.from_documents(
+                    [],  # 不需要文档，数据已在Neo4j中
+                    graph_store=graph_store,
+                    include_embeddings=True,
+                    max_triplets_per_chunk=10,
+                )
                 print("【Neo4j】Neo4j图谱索引加载成功! ✓")
                 
                 # 测试图谱查询
@@ -243,7 +243,7 @@ def startup_event():
                 
                 # 尝试不使用APOC创建图谱索引
                 try:
-                    from llama_index.graph_stores.simple import SimpleGraphStore
+                    from llama_index.core.graph_stores import SimpleGraphStore
                     
                     # 使用简单图谱存储作为回退
                     simple_graph_store = SimpleGraphStore()
@@ -340,13 +340,13 @@ async def handle_chat_request(request: ChatRequest):
         # 创建图谱检索器
         try:
             print(f"【Neo4j】正在创建图谱检索器，连接到 {NEO4J_URI}")
-        graph_retriever = kg_index.as_retriever(
-            include_text=True,
-            similarity_top_k=top_k,
-        )
+            graph_retriever = kg_index.as_retriever(
+                include_text=True,
+                similarity_top_k=top_k,
+            )
             print(f"【Neo4j】图谱检索器创建成功!")
-        # 将图检索器添加到检索器列表
-        retrievers.append(graph_retriever)
+            # 将图检索器添加到检索器列表
+            retrievers.append(graph_retriever)
         except Exception as e:
             print(f"【Neo4j错误】创建图谱检索器失败: {e}")
     elif use_graph and kg_index is None:

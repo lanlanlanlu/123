@@ -35,7 +35,7 @@ PERSIST_DIR = "./storage"
 DB_PATH = "D:\\am4yne\\Documents\\record.sqlite" 
 
 # --- 切分参数配置 ---
-CHUNK_SIZE = 512
+CHUNK_SIZE = 1024  # 增加为1024，原来是512
 CHUNK_OVERLAP = 20
 
 # --- 辅助函数 ---
