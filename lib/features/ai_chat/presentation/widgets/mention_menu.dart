@@ -5,6 +5,7 @@ import 'package:record_app/data/repository/notes_repository.dart';
 import 'package:record_app/data/repository/recent_mentions_repository.dart';
 import 'package:record_app/data/database/connection/connection.dart' as connection;
 import 'package:flutter/foundation.dart';
+import 'package:record_app/core/utils/search_service.dart';
 
 /// 表示可在聊天中@的项目类型
 enum MentionType {
@@ -210,6 +211,7 @@ class _MentionMenuContent extends StatefulWidget {
   State<_MentionMenuContent> createState() => _MentionMenuContentState();
 }
 
+// 修改_MentionMenuContentState类，添加搜索相关功能
 class _MentionMenuContentState extends State<_MentionMenuContent> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -225,6 +227,13 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   
   // 最近提及仓库
   final RecentMentionsRepository _recentMentionsRepository = RecentMentionsRepository();
+  
+  // 搜索服务
+  final SearchService _searchService = SearchService();
+  
+  // 搜索结果
+  List<SearchResultItem> _searchResults = [];
+  bool _isSearching = false;
   
   // 笔记列表
   List<Note> _notes = [];
@@ -271,11 +280,76 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
     // 防止搜索框焦点变化导致菜单关闭
     _focusNode.addListener(_handleFocusChange);
     
+    // 添加搜索文本变化监听器
+    _searchController.addListener(_handleSearchTextChanged);
+    
     // 短暂延迟后，如果指定了autofocus为true，则请求焦点
     if (widget.autofocus) {
       Future.delayed(const Duration(milliseconds: 200), () {
         requestFocusForSearchField();
       });
+    }
+  }
+  
+  // 处理搜索文本变化
+  void _handleSearchTextChanged() {
+    final query = _searchController.text.trim();
+    
+    // 当用户输入搜索文本时，执行搜索
+    if (query.isNotEmpty) {
+      _performSearch(query);
+    } else {
+      // 清空搜索结果，恢复主菜单
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+    }
+  }
+  
+  // 执行搜索操作
+  Future<void> _performSearch(String query) async {
+    // 设置为正在搜索状态
+    setState(() {
+      _isSearching = true;
+    });
+    
+    try {
+      // 执行搜索
+      List<SearchResultItem> results;
+      
+      // 根据当前模式决定搜索范围
+      switch (_currentMode) {
+        case MenuMode.notes:
+          results = await _searchService.searchNotes(query);
+          break;
+        case MenuMode.tags:
+          results = await _searchService.searchTags(query);
+          break;
+        case MenuMode.locations:
+          results = await _searchService.searchLocations(query);
+          break;
+        case MenuMode.main:
+        default:
+          results = await _searchService.searchAll(query);
+          break;
+      }
+      
+      // 更新UI，显示搜索结果
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
+    } catch (error) {
+      debugPrint('搜索错误: $error');
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
+        });
+      }
     }
   }
   
@@ -295,6 +369,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
 
   @override
   void dispose() {
+    _searchController.removeListener(_handleSearchTextChanged);
     _searchController.dispose();
     _focusNode.removeListener(_handleFocusChange);
     _focusNode.dispose();
@@ -445,8 +520,11 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 根据当前模式显示不同的内容
-                  if (_currentMode == MenuMode.main) ...[
+                  // 根据搜索状态和当前模式显示不同的内容
+                  if (_searchController.text.isNotEmpty) ...[
+                    // 搜索结果
+                    _buildSearchResultsContent(),
+                  ] else if (_currentMode == MenuMode.main) ...[
                     _buildMainMenuContent(),
                   ] else if (_currentMode == MenuMode.notes) ...[
                     _buildNotesListContent(),
@@ -947,6 +1025,117 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
                   location,
                   style: const TextStyle(fontSize: 14),
                   overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 构建搜索结果内容
+  Widget _buildSearchResultsContent() {
+    if (_isSearching) {
+      return SizedBox(
+        height: menuHeight,
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    if (_searchResults.isEmpty) {
+      return SizedBox(
+        height: menuHeight,
+        child: const Center(
+          child: Text(
+            '无搜索结果',
+            style: TextStyle(fontSize: 14, color: Colors.black54),
+          ),
+        ),
+      );
+    }
+
+    // 使用ListView显示搜索结果，可上下滚动
+    return SizedBox(
+      height: menuHeight,
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        padding: EdgeInsets.zero,
+        itemCount: _searchResults.length,
+        separatorBuilder: (_, __) => _divider,
+        itemBuilder: (context, index) {
+          final result = _searchResults[index];
+          return _buildSearchResultItem(result);
+        },
+      ),
+    );
+  }
+
+  // 构建单个搜索结果项
+  Widget _buildSearchResultItem(SearchResultItem result) {
+    // 根据结果类型设置图标
+    IconData icon;
+    MentionType mentionType;
+    
+    switch (result.type) {
+      case SearchType.note:
+        icon = Icons.description;
+        mentionType = MentionType.note;
+        break;
+      case SearchType.tag:
+        icon = Icons.label;
+        mentionType = MentionType.tag;
+        break;
+      case SearchType.location:
+        icon = Icons.location_on;
+        mentionType = MentionType.location;
+        break;
+      default:
+        icon = Icons.search;
+        mentionType = MentionType.note;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          // 先关闭菜单
+          widget.controller.hide();
+          
+          // 然后触发回调
+          widget.onItemSelected(
+            MentionItem(
+              id: result.id,
+              title: result.title,
+              type: mentionType,
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: Colors.black54),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      result.title,
+                      style: const TextStyle(fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (result.subtitle != null && result.subtitle!.isNotEmpty)
+                      Text(
+                        result.subtitle!,
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                  ],
                 ),
               ),
             ],
