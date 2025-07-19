@@ -67,11 +67,8 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
   void didChangeMetrics() {
     super.didChangeMetrics();
     
-    // 当键盘状态变化时，如果菜单正在显示，先隐藏菜单
-    // 避免菜单跟随输入框重新定位，这会导致键盘自动弹出
-    if (_menuController?.isShowing == true) {
-      _hideMentionMenu();
-    }
+    // 不要在键盘状态变化时关闭菜单，让菜单自己管理其生命周期
+    // 键盘状态变化只会影响焦点，不应该自动关闭菜单
   }
   
   void _onTextChanged() {
@@ -185,19 +182,24 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
 
   void _showMentionMenu() {
     // 隐藏当前菜单（如果有）
-    _hideMentionMenu();
+    if (_menuController != null) {
+      _menuController?.dispose();
+      _menuController = null;
+    }
     
     // 显示新菜单，使用LayerLink进行精确定位
-    _menuController = MentionMenu.show(
-      context: context, 
-      layerLink: _inputFieldLayerLink,
-      onItemSelected: _handleMentionSelected,
-      onSearchSubmitted: _handleMentionSearchSubmitted,
-      verticalOffset: -5, // 向上偏移，显示在输入框上方
-      horizontalOffset: 10, // 水平偏移，使菜单与输入框有一定距离
-      menuWidth: 220.0,
-      autofocus: false, // 禁用自动获取焦点，避免键盘问题
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _menuController = MentionMenu.show(
+        context: context, 
+        layerLink: _inputFieldLayerLink,
+        onItemSelected: _handleMentionSelected,
+        onSearchSubmitted: _handleMentionSearchSubmitted,
+        verticalOffset: -5, // 向上偏移，显示在输入框上方
+        horizontalOffset: 10, // 水平偏移，使菜单与输入框有一定距离
+        menuWidth: 220.0,
+        autofocus: false, // 禁用自动获取焦点，避免键盘问题
+      );
+    });
   }
 
   @override
@@ -368,7 +370,7 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                 height: 1.3,
                               ),
                               decoration: const InputDecoration(
-                                hintText: '发个v个哥哥哥吧好吧哈哈哈哈哈哈哈发个',
+                                hintText: 'Ask me notes or anything',
                                 hintStyle: TextStyle(
                                   color: Colors.black45,
                                   fontSize: 16,
@@ -396,10 +398,13 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                             children: [
                               // @按钮
                               IconButton(
-                                icon: const Icon(
-                                  Icons.add,
-                                  color: Colors.black54,
-                                  size: 26,
+                                icon: const Text(
+                                  '@',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black54,
+                                  ),
                                 ),
                                 onPressed: _showMentionMenu,
                                 padding: EdgeInsets.zero,

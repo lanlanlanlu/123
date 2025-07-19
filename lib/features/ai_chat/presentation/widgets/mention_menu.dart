@@ -38,16 +38,30 @@ enum MenuMode {
 class MentionMenuController {
   OverlayEntry? _overlayEntry;
   bool get isShowing => _overlayEntry != null;
+  bool _isClosingAllowed = true;
+  
+  // 禁止关闭菜单
+  void preventClose() {
+    _isClosingAllowed = false;
+  }
+  
+  // 允许关闭菜单
+  void allowClose() {
+    _isClosingAllowed = true;
+  }
   
   void hide() {
-    if (_overlayEntry != null) {
+    if (_overlayEntry != null && _isClosingAllowed) {
       _overlayEntry!.remove();
       _overlayEntry = null;
     }
   }
   
   void dispose() {
-    hide();
+    if (_overlayEntry != null) {
+      _overlayEntry!.remove();
+      _overlayEntry = null;
+    }
   }
 }
 
@@ -138,24 +152,31 @@ class _MentionMenuOverlay extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: () => controller.hide(),
-      child: Stack(
-        children: [
-          _MentionMenuContent(
-            layerLink: layerLink,
-            verticalOffset: verticalOffset,
-            horizontalOffset: horizontalOffset,
-            menuWidth: menuWidth,
-            onItemSelected: onItemSelected,
-            onSearchSubmitted: onSearchSubmitted,
-            inputBoxHeight: inputBoxHeight,
-            autofocus: autofocus,
-            controller: controller,
+    return Stack(
+      children: [
+        // 使用ModalBarrier处理点击关闭，而不是GestureDetector
+        Positioned.fill(
+          child: ModalBarrier(
+            color: Colors.transparent,
+            dismissible: true,
+            onDismiss: () {
+              // 只有在允许关闭的情况下才关闭菜单
+              controller.hide();
+            },
           ),
-        ],
-      ),
+        ),
+        _MentionMenuContent(
+          layerLink: layerLink,
+          verticalOffset: verticalOffset,
+          horizontalOffset: horizontalOffset,
+          menuWidth: menuWidth,
+          onItemSelected: onItemSelected,
+          onSearchSubmitted: onSearchSubmitted,
+          inputBoxHeight: inputBoxHeight,
+          autofocus: autofocus,
+          controller: controller,
+        ),
+      ],
     );
   }
 }
@@ -227,16 +248,47 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   // 增加1个像素的额外空间来避免溢出
   static const double menuHeight = 5 * itemHeight + 1.0; // 添加1像素余量避免溢出
 
+  // 为搜索框请求焦点的方法
+  void requestFocusForSearchField() {
+    // 阻止菜单关闭
+    widget.controller.preventClose();
+    // 请求焦点
+    _focusNode.requestFocus();
+    // 恢复菜单可关闭状态
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        widget.controller.allowClose();
+      }
+    });
+  }
+  
   @override
   void initState() {
     super.initState();
     // 加载最近提及
     _loadRecentMentions();
     
-    // 只有在明确指定autofocus为true时才请求焦点
+    // 防止搜索框焦点变化导致菜单关闭
+    _focusNode.addListener(_handleFocusChange);
+    
+    // 短暂延迟后，如果指定了autofocus为true，则请求焦点
     if (widget.autofocus) {
+      Future.delayed(const Duration(milliseconds: 200), () {
+        requestFocusForSearchField();
+      });
+    }
+  }
+  
+  void _handleFocusChange() {
+    // 当搜索框获得或失去焦点时
+    if (_focusNode.hasFocus) {
+      // 搜索框获得焦点时，防止菜单关闭
+      widget.controller.preventClose();
+      // 短暂延迟后恢复可关闭状态，但此时搜索框已经获取到焦点了
       Future.delayed(const Duration(milliseconds: 100), () {
-        _focusNode.requestFocus();
+        if (mounted) {
+          widget.controller.allowClose();
+        }
       });
     }
   }
@@ -244,6 +296,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   @override
   void dispose() {
     _searchController.dispose();
+    _focusNode.removeListener(_handleFocusChange);
     _focusNode.dispose();
     super.dispose();
   }
@@ -374,63 +427,68 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           elevation: 8.0,
           borderRadius: BorderRadius.circular(12),
           color: Colors.transparent,
-          child: GestureDetector(
-            // 阻止点击事件冒泡到外层
-            onTap: () {},
-            child: Container(
-              width: widget.menuWidth,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 根据当前模式显示不同的内容
-                    if (_currentMode == MenuMode.main) ...[
-                      _buildMainMenuContent(),
-                    ] else if (_currentMode == MenuMode.notes) ...[
-                      _buildNotesListContent(),
-                    ] else if (_currentMode == MenuMode.tags) ...[
-                      _buildTagsListContent(),
-                    ] else if (_currentMode == MenuMode.locations) ...[
-                      _buildLocationsListContent(),
-                    ],
-                    
-                    _divider,
-                    // 搜索输入框
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                      child: TextField(
-                        controller: _searchController,
-                        focusNode: _focusNode,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          hintText: _getSearchHintText(),
-                          hintStyle: const TextStyle(fontSize: 14, color: Colors.black38),
-                          border: InputBorder.none,
-                          isDense: true,
+          child: Container(
+            width: widget.menuWidth,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 根据当前模式显示不同的内容
+                  if (_currentMode == MenuMode.main) ...[
+                    _buildMainMenuContent(),
+                  ] else if (_currentMode == MenuMode.notes) ...[
+                    _buildNotesListContent(),
+                  ] else if (_currentMode == MenuMode.tags) ...[
+                    _buildTagsListContent(),
+                  ] else if (_currentMode == MenuMode.locations) ...[
+                    _buildLocationsListContent(),
+                  ],
+                  
+                  _divider,
+                  // 搜索输入框
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                    child: GestureDetector(
+                      // 防止点击搜索框时菜单关闭
+                      onTap: () {
+                        requestFocusForSearchField();
+                      },
+                      child: AbsorbPointer(
+                        absorbing: false,
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _focusNode,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            hintText: _getSearchHintText(),
+                            hintStyle: const TextStyle(fontSize: 14, color: Colors.black38),
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                          style: const TextStyle(fontSize: 14),
+                          onSubmitted: (value) {
+                            if (value.isNotEmpty) {
+                              widget.controller.hide();
+                              widget.onSearchSubmitted(value);
+                            }
+                          },
                         ),
-                        style: const TextStyle(fontSize: 14),
-                        onSubmitted: (value) {
-                          if (value.isNotEmpty) {
-                            widget.controller.hide();
-                            widget.onSearchSubmitted(value);
-                          }
-                        },
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
