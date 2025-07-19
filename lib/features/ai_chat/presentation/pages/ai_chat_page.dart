@@ -40,6 +40,12 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
   // 最近提及仓库
   final RecentMentionsRepository _recentMentionsRepository = RecentMentionsRepository();
 
+  // 存储@提及项目的列表
+  final List<MentionItem> _mentionItems = [];
+  
+  // 输入框中的文本，用于管理带@提及的内容
+  String _plainText = '';
+
   @override
   void initState() {
     super.initState();
@@ -92,6 +98,9 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
       // 如果之前有@但现在被删除了，重置位置
       _lastAtPosition = -1;
     }
+    
+    // 更新纯文本内容
+    _plainText = text;
   }
   
   // 记录上次触发@菜单的位置，避免重复触发
@@ -114,24 +123,35 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
     // 从 context 中读取由 BlocProvider 提供的 BLoC 实例
     context.read<AiChatBloc>().add(AiChatMessageSent(chatMessage));
     _textController.clear();
+    
+    // 清除@提及项列表
+    setState(() {
+      _mentionItems.clear();
+      _plainText = '';
+    });
   }
 
   void _handleMentionSelected(MentionItem item) {
-    // 根据选择的提及项添加到输入框中
-    final currentText = _textController.text;
-    final mentionText = '@${item.title} ';
+    // 添加到@提及项列表
+    setState(() {
+      _mentionItems.add(item);
+    });
     
-    // 插入@提及
+    // 安全处理光标位置
+    String currentText = _textController.text;
+    
+    // 删除刚才输入的@
     if (currentText.endsWith('@')) {
-      _textController.text = currentText.substring(0, currentText.length - 1) + mentionText;
-    } else {
-      _textController.text = currentText + mentionText;
+      final newText = currentText.substring(0, currentText.length - 1);
+      // 直接使用值更新文本，不触发光标位置变化
+      _textController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newText.length),
+      );
     }
     
-    // 将光标移至末尾
-    _textController.selection = TextSelection.fromPosition(
-      TextPosition(offset: _textController.text.length),
-    );
+    // 更新纯文本内容
+    _plainText = _textController.text;
     
     // 异步记录最近使用的提及，避免阻塞UI
     Future.microtask(() {
@@ -154,21 +174,32 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
   }
 
   void _handleMentionSearchSubmitted(String text) {
-    // 处理搜索提交
-    final mentionText = '@$text ';
+    if (text.isEmpty) return;
     
-    // 插入@提及
-    final currentText = _textController.text;
+    // 添加到@提及项列表，作为自定义项
+    setState(() {
+      _mentionItems.add(MentionItem(
+        id: text,
+        title: text,
+        type: MentionType.tag,
+      ));
+    });
+    
+    // 安全处理光标位置
+    String currentText = _textController.text;
+    
+    // 删除刚才输入的@
     if (currentText.endsWith('@')) {
-      _textController.text = currentText.substring(0, currentText.length - 1) + mentionText;
-    } else {
-      _textController.text = currentText + mentionText;
+      final newText = currentText.substring(0, currentText.length - 1);
+      // 直接使用值更新文本，不触发光标位置变化
+      _textController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newText.length),
+      );
     }
     
-    // 将光标移至末尾
-    _textController.selection = TextSelection.fromPosition(
-      TextPosition(offset: _textController.text.length),
-    );
+    // 更新纯文本内容
+    _plainText = _textController.text;
     
     // 异步记录最近使用的搜索提及，避免阻塞UI
     Future.microtask(() {
@@ -200,6 +231,25 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
         autofocus: false, // 禁用自动获取焦点，避免键盘问题
       );
     });
+  }
+  
+  // 移除某个@提及项
+  void _removeMentionItem(MentionItem item) {
+    setState(() {
+      _mentionItems.remove(item);
+    });
+  }
+  
+  // 根据提及类型获取对应图标
+  IconData _getIconForMentionType(MentionType type) {
+    switch (type) {
+      case MentionType.note:
+        return Icons.description;
+      case MentionType.tag:
+        return Icons.label;
+      case MentionType.location:
+        return Icons.location_on;
+    }
   }
 
   @override
@@ -355,6 +405,45 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // @提及项的显示区域
+                        if (_mentionItems.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10.0, left: 16.0, right: 16.0),
+                            child: SizedBox(
+                              height: 30,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: _mentionItems.length,
+                                separatorBuilder: (context, index) => const SizedBox(width: 6),
+                                itemBuilder: (context, index) {
+                                  final item = _mentionItems[index];
+                                  return InputChip(
+                                    avatar: Icon(
+                                      _getIconForMentionType(item.type),
+                                      size: 14,
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                    label: Text(
+                                      item.title,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                    labelPadding: EdgeInsets.zero,
+                                    backgroundColor: Colors.grey[100],
+                                    deleteIcon: const Icon(Icons.close, size: 12),
+                                    onDeleted: () => _removeMentionItem(item),
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 0),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          
                         // 文本输入框
                         CompositedTransformTarget(
                           link: _inputFieldLayerLink,
@@ -432,7 +521,19 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                   ),
                                   onPressed: state.isLoading
                                       ? null
-                                      : () => _handleSendMessage(_textController.text),
+                                      : () {
+                                          // 构建发送文本：结合纯文本和@提及项
+                                          String messageText = _plainText;
+                                          for (var item in _mentionItems) {
+                                            final mentionText = switch (item.type) {
+                                              MentionType.note => '【笔记:${item.title}】',
+                                              MentionType.tag => '【标签:${item.title}】',
+                                              MentionType.location => '【地点:${item.title}】',
+                                            };
+                                            messageText = '$messageText $mentionText';
+                                          }
+                                          _handleSendMessage(messageText.trim());
+                                        },
                                   padding: EdgeInsets.zero,
                                 ),
                               ),
