@@ -9,6 +9,8 @@ import '../widgets/chat_error_display.dart';
 import '../widgets/mention_menu.dart';
 import 'package:intl/intl.dart';
 import 'package:record_app/data/repository/ai_chat_repository.dart';
+import 'package:flutter/rendering.dart';
+import 'package:record_app/data/repository/recent_mentions_repository.dart';
 
 /// AI聊天页面
 class AiChatPage extends StatefulWidget {
@@ -19,16 +21,24 @@ class AiChatPage extends StatefulWidget {
 }
 
 class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
-  late final ChatUser _currentUser;
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   
-  // 链接输入框和菜单
+  // 用于菜单定位的链接
   final LayerLink _inputFieldLayerLink = LayerLink();
   
   // 菜单控制器
   MentionMenuController? _menuController;
+  
+  // 当前用户（使用dash_chat_2中的ChatUser）
+  final ChatUser _currentUser = ChatUser(
+    id: 'user_1', 
+    firstName: '我'
+  );
+  
+  // 最近提及仓库
+  final RecentMentionsRepository _recentMentionsRepository = RecentMentionsRepository();
 
   @override
   void initState() {
@@ -36,13 +46,6 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
     
     // 添加观察者以监听键盘变化
     WidgetsBinding.instance.addObserver(this);
-    
-    // 创建当前用户，实际应用中应从认证服务获取用户信息
-    _currentUser = ChatUser(
-      id: 'user',
-      firstName: '用户',
-      lastName: '',
-    );
     
     // 添加文本监听器
     _textController.addListener(_onTextChanged);
@@ -73,16 +76,29 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
   
   void _onTextChanged() {
     final text = _textController.text;
+    final selection = _textController.selection;
     
-    // 如果最后一个字符是@，显示菜单
-    if (text.isNotEmpty && text.endsWith('@') && !_previousText.endsWith('@')) {
+    // 检查当前光标位置前的字符是否为@
+    if (text.isNotEmpty && 
+        selection.baseOffset > 0 && 
+        selection.baseOffset <= text.length && 
+        text[selection.baseOffset - 1] == '@' &&
+        (_lastAtPosition == -1 || _lastAtPosition != selection.baseOffset - 1)) {
+      
+      // 记录当前@的位置，避免重复触发
+      _lastAtPosition = selection.baseOffset - 1;
       _showMentionMenu();
+    } else if (_lastAtPosition != -1 && 
+              (text.isEmpty || 
+               _lastAtPosition >= text.length || 
+               text[_lastAtPosition] != '@')) {
+      // 如果之前有@但现在被删除了，重置位置
+      _lastAtPosition = -1;
     }
-    
-    _previousText = text;
   }
   
-  String _previousText = '';
+  // 记录上次触发@菜单的位置，避免重复触发
+  int _lastAtPosition = -1;
   
   void _hideMentionMenu() {
     _menuController?.hide();
@@ -119,6 +135,25 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
     _textController.selection = TextSelection.fromPosition(
       TextPosition(offset: _textController.text.length),
     );
+    
+    // 异步记录最近使用的提及，避免阻塞UI
+    Future.microtask(() {
+      switch (item.type) {
+        case MentionType.note:
+          _recentMentionsRepository.addRecentMention(
+            type: 'note',
+            itemId: item.id,
+            title: item.title,
+          );
+          break;
+        case MentionType.tag:
+          _recentMentionsRepository.addTagMention(item.title);
+          break;
+        case MentionType.location:
+          _recentMentionsRepository.addLocationMention(item.title);
+          break;
+      }
+    });
   }
 
   void _handleMentionSearchSubmitted(String text) {
@@ -137,6 +172,15 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
     _textController.selection = TextSelection.fromPosition(
       TextPosition(offset: _textController.text.length),
     );
+    
+    // 异步记录最近使用的搜索提及，避免阻塞UI
+    Future.microtask(() {
+      _recentMentionsRepository.addRecentMention(
+        type: 'search',
+        itemId: text,
+        title: text,
+      );
+    });
   }
 
   void _showMentionMenu() {
@@ -149,8 +193,8 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
       layerLink: _inputFieldLayerLink,
       onItemSelected: _handleMentionSelected,
       onSearchSubmitted: _handleMentionSearchSubmitted,
-      verticalOffset: -2, // 向上偏移2像素，留出小缝隙
-      horizontalOffset: -46, // 水平向左偏移，使菜单与@按钮左侧对齐
+      verticalOffset: -5, // 向上偏移，显示在输入框上方
+      horizontalOffset: 10, // 水平偏移，使菜单与输入框有一定距离
       menuWidth: 220.0,
       autofocus: false, // 禁用自动获取焦点，避免键盘问题
     );
@@ -174,49 +218,104 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
           });
         },
         builder: (context, state) {
-          return Column(
-            children: [
-              // 错误提示（如果有）
-              if (state.error != null)
-                ChatErrorDisplay(error: state.error!),
-              
-              // 聊天消息列表
-              Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(8.0),
-                  reverse: true,
-                  itemCount: state.messages.length,
-                  itemBuilder: (context, index) {
-                    final message = state.messages.reversed.toList()[index];
-                    final isAi = message.user.id == 'ai_assistant';
-                    
-                    // AI消息
-                    if (isAi) {
+          return Container(
+            color: Colors.grey[50], // 浅灰色背景，类似图片中的背景色
+            child: Column(
+              children: [
+                // 错误提示（如果有）
+                if (state.error != null)
+                  ChatErrorDisplay(error: state.error!),
+                
+                // 聊天消息列表
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(8.0),
+                    reverse: true,
+                    itemCount: state.messages.length,
+                    itemBuilder: (context, index) {
+                      final message = state.messages.reversed.toList()[index];
+                      final isAi = message.user.id == 'ai_assistant';
+                      
+                      // AI消息
+                      if (isAi) {
+                        return Container(
+                          margin: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                constraints: BoxConstraints(
+                                  maxWidth: MediaQuery.of(context).size.width * 0.9,
+                                ),
+                                padding: const EdgeInsets.all(12.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  message.text,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0, left: 4.0),
+                                child: Text(
+                                  DateFormat('HH:mm').format(message.createdAt),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
+                      // 用户消息
                       return Container(
                         margin: const EdgeInsets.symmetric(vertical: 8.0),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Container(
-                              constraints: BoxConstraints(
-                                maxWidth: MediaQuery.of(context).size.width * 0.9,
-                              ),
-                              padding: const EdgeInsets.all(12.0),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                message.text,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black87,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Container(
+                                  constraints: BoxConstraints(
+                                    maxWidth: MediaQuery.of(context).size.width * 0.7,
+                                  ),
+                                  padding: const EdgeInsets.all(12.0),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    message.text,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 8),
+                                CircleAvatar(
+                                  radius: 15,
+                                  backgroundColor: Theme.of(context).primaryColor,
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                             Padding(
-                              padding: const EdgeInsets.only(top: 4.0, left: 4.0),
+                              padding: const EdgeInsets.only(top: 4.0, right: 4.0),
                               child: Text(
                                 DateFormat('HH:mm').format(message.createdAt),
                                 style: TextStyle(
@@ -228,133 +327,126 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                           ],
                         ),
                       );
-                    }
-                    
-                    // 用户消息
-                    return Container(
-                      margin: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                    },
+                  ),
+                ),
+                
+                // 底部输入框
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        )
+                      ],
+                      border: Border.all(
+                        color: Colors.grey.withOpacity(0.15),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 文本输入框
+                        CompositedTransformTarget(
+                          link: _inputFieldLayerLink,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 4.0),
+                            child: TextField(
+                              controller: _textController,
+                              focusNode: _focusNode,
+                              minLines: 1,
+                              maxLines: 5, // 允许自动扩展到最多5行
+                              style: const TextStyle(
+                                fontSize: 16,
+                                height: 1.3,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: '发个v个哥哥哥吧好吧哈哈哈哈哈哈哈发个',
+                                hintStyle: TextStyle(
+                                  color: Colors.black45,
+                                  fontSize: 16,
+                                  height: 1.3,
+                                ),
+                                contentPadding: EdgeInsets.zero,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                fillColor: Colors.transparent,
+                                filled: true,
+                                isDense: true,
+                              ),
+                              textInputAction: TextInputAction.newline,
+                            ),
+                          ),
+                        ),
+                        
+                        // 底部按钮栏
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                          child: Row(
                             children: [
-                              Container(
-                                constraints: BoxConstraints(
-                                  maxWidth: MediaQuery.of(context).size.width * 0.7,
+                              // @按钮
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.add,
+                                  color: Colors.black54,
+                                  size: 26,
                                 ),
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).primaryColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  message.text,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.white,
-                                  ),
+                                onPressed: _showMentionMenu,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              CircleAvatar(
-                                radius: 15,
-                                backgroundColor: Theme.of(context).primaryColor,
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 18,
-                                  color: Colors.white,
+                              
+                              const Spacer(),
+                              
+                              // 发送按钮
+                              Container(
+                                height: 40,
+                                width: 40,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: IconButton(
+                                  icon: Icon(
+                                    Icons.arrow_forward,
+                                    color: state.isLoading ? Colors.grey : Colors.black,
+                                    size: 22,
+                                  ),
+                                  onPressed: state.isLoading
+                                      ? null
+                                      : () => _handleSendMessage(_textController.text),
+                                  padding: EdgeInsets.zero,
                                 ),
                               ),
                             ],
                           ),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0, right: 4.0),
-                            child: Text(
-                              DateFormat('HH:mm').format(message.createdAt),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              
-              // 底部输入框
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      spreadRadius: 1,
-                      blurRadius: 2,
-                      offset: const Offset(0, -1),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // @按钮
-                    IconButton(
-                      icon: const Text(
-                        '@',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
                         ),
-                      ),
-                      onPressed: _showMentionMenu,
-                      color: Theme.of(context).primaryColor,
+                      ],
                     ),
-                    Expanded(
-                      child: CompositedTransformTarget(
-                        link: _inputFieldLayerLink,
-                        child: TextField(
-                          controller: _textController,
-                          focusNode: _focusNode,
-                          decoration: InputDecoration(
-                            hintText: '输入消息...',
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 8.0,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                              borderSide: BorderSide.none,
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                          ),
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: _handleSendMessage,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.send),
-                      onPressed: state.isLoading
-                          ? null
-                          : () => _handleSendMessage(_textController.text),
-                      color: Theme.of(context).primaryColor,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              
-              // 底部加载指示器
-              if (state.isLoading)
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: LinearProgressIndicator(),
-                ),
-            ],
+                
+                // 底部加载指示器
+                if (state.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: LinearProgressIndicator(),
+                  ),
+              ],
+            ),
           );
         },
       ),

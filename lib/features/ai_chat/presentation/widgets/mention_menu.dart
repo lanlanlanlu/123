@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:record_app/core/widgets/context_menu.dart';
+import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/notes_repository.dart';
+import 'package:record_app/data/repository/recent_mentions_repository.dart';
+import 'package:record_app/data/database/connection/connection.dart' as connection;
+import 'package:flutter/foundation.dart';
 
 /// 表示可在聊天中@的项目类型
 enum MentionType {
@@ -19,6 +24,14 @@ class MentionItem {
     required this.title,
     required this.type,
   });
+}
+
+/// 菜单模式
+enum MenuMode {
+  main,      // 主菜单模式
+  notes,     // 笔记列表模式
+  tags,      // 标签列表模式
+  locations, // 地点列表模式
 }
 
 /// @菜单控制器，用于管理菜单的显示和隐藏
@@ -179,10 +192,47 @@ class _MentionMenuContent extends StatefulWidget {
 class _MentionMenuContentState extends State<_MentionMenuContent> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  
+  // 当前菜单模式
+  MenuMode _currentMode = MenuMode.main;
+  
+  // 数据库连接
+  final AppDatabase _database = connection.connect();
+  
+  // 笔记数据仓库
+  final NotesRepository _notesRepository = NotesRepository();
+  
+  // 最近提及仓库
+  final RecentMentionsRepository _recentMentionsRepository = RecentMentionsRepository();
+  
+  // 笔记列表
+  List<Note> _notes = [];
+  bool _isLoading = false;
+  
+  // 最近提及列表
+  List<RecentMention> _recentMentions = [];
+  bool _isLoadingMentions = false;
+  
+  // 标签列表
+  List<Tag> _tags = [];
+  bool _isLoadingTags = false;
+  
+  // 地点列表
+  List<String> _locations = [];
+  bool _isLoadingLocations = false;
+  
+  // 定义菜单高度常量
+  static const double itemHeight = 41.0; // 单个条目高度
+  static const double dividerHeight = 1.0;
+  // 增加1个像素的额外空间来避免溢出
+  static const double menuHeight = 5 * itemHeight + 1.0; // 添加1像素余量避免溢出
 
   @override
   void initState() {
     super.initState();
+    // 加载最近提及
+    _loadRecentMentions();
+    
     // 只有在明确指定autofocus为true时才请求焦点
     if (widget.autofocus) {
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -196,6 +246,111 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
     _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  // 加载最近提及记录
+  void _loadRecentMentions() {
+    setState(() {
+      _isLoadingMentions = true;
+    });
+    
+    _recentMentionsRepository.getRecentMentions(limit: 2).then((mentions) {
+      if (mounted) {
+        setState(() {
+          _recentMentions = mentions;
+          _isLoadingMentions = false;
+        });
+      }
+    });
+  }
+  
+  // 加载笔记列表
+  void _loadNotes() {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    _notesRepository.getAllNotes().then((notes) {
+      if (mounted) {
+        setState(() {
+          _notes = notes;
+          _isLoading = false;
+        });
+      }
+    });
+  }
+  
+  // 加载标签列表
+  void _loadTags() {
+    setState(() {
+      _isLoadingTags = true;
+    });
+    
+    // 使用TagDao的watchAllTags方法获取所有标签，并转换为Future
+    _database.tagDao.watchAllTags().first.then((tags) {
+      if (mounted) {
+        setState(() {
+          _tags = tags;
+          _isLoadingTags = false;
+        });
+      }
+    }).catchError((error) {
+      debugPrint('Error loading tags: $error');
+      if (mounted) {
+        setState(() {
+          _tags = [];
+          _isLoadingTags = false;
+        });
+      }
+    });
+  }
+  
+  // 加载地点列表
+  void _loadLocations() {
+    setState(() {
+      _isLoadingLocations = true;
+    });
+    
+    _notesRepository.getAllLocations().then((locations) {
+      if (mounted) {
+        setState(() {
+          _locations = locations;
+          _isLoadingLocations = false;
+        });
+      }
+    }).catchError((error) {
+      debugPrint('Error loading locations: $error');
+      if (mounted) {
+        setState(() {
+          _locations = [];
+          _isLoadingLocations = false;
+        });
+      }
+    });
+  }
+
+  // 切换到笔记列表模式
+  void _switchToNotesMode() {
+    setState(() {
+      _currentMode = MenuMode.notes;
+      _loadNotes();
+    });
+  }
+  
+  // 切换到标签列表模式
+  void _switchToTagsMode() {
+    setState(() {
+      _currentMode = MenuMode.tags;
+      _loadTags();
+    });
+  }
+  
+  // 切换到地点列表模式
+  void _switchToLocationsMode() {
+    setState(() {
+      _currentMode = MenuMode.locations;
+      _loadLocations();
+    });
   }
 
   @override
@@ -240,51 +395,17 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 固定选项
-                    _buildMenuOption(
-                      icon: Icons.note,
-                      title: '笔记',
-                      onTap: () {
-                        widget.controller.hide();
-                        widget.onItemSelected(
-                          const MentionItem(
-                            id: 'notes',
-                            title: '笔记',
-                            type: MentionType.note,
-                          ),
-                        );
-                      },
-                    ),
-                    _divider,
-                    _buildMenuOption(
-                      icon: Icons.label,
-                      title: '标签',
-                      onTap: () {
-                        widget.controller.hide();
-                        widget.onItemSelected(
-                          const MentionItem(
-                            id: 'tags',
-                            title: '标签',
-                            type: MentionType.tag,
-                          ),
-                        );
-                      },
-                    ),
-                    _divider,
-                    _buildMenuOption(
-                      icon: Icons.location_on,
-                      title: '地点',
-                      onTap: () {
-                        widget.controller.hide();
-                        widget.onItemSelected(
-                          const MentionItem(
-                            id: 'locations',
-                            title: '地点',
-                            type: MentionType.location,
-                          ),
-                        );
-                      },
-                    ),
+                    // 根据当前模式显示不同的内容
+                    if (_currentMode == MenuMode.main) ...[
+                      _buildMainMenuContent(),
+                    ] else if (_currentMode == MenuMode.notes) ...[
+                      _buildNotesListContent(),
+                    ] else if (_currentMode == MenuMode.tags) ...[
+                      _buildTagsListContent(),
+                    ] else if (_currentMode == MenuMode.locations) ...[
+                      _buildLocationsListContent(),
+                    ],
+                    
                     _divider,
                     // 搜索输入框
                     Padding(
@@ -292,10 +413,10 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
                       child: TextField(
                         controller: _searchController,
                         focusNode: _focusNode,
-                        decoration: const InputDecoration(
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          hintText: '添加笔记，地点，标签...',
-                          hintStyle: TextStyle(fontSize: 14, color: Colors.black38),
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          hintText: _getSearchHintText(),
+                          hintStyle: const TextStyle(fontSize: 14, color: Colors.black38),
                           border: InputBorder.none,
                           isDense: true,
                         ),
@@ -312,6 +433,263 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // 根据当前模式获取搜索框的提示文字
+  String _getSearchHintText() {
+    switch (_currentMode) {
+      case MenuMode.notes:
+        return '搜索笔记...';
+      case MenuMode.tags:
+        return '搜索标签...';
+      case MenuMode.locations:
+        return '搜索地点...';
+      case MenuMode.main:
+      default:
+        return '添加笔记，地点，标签...';
+    }
+  }
+
+  // 构建主菜单内容
+  Widget _buildMainMenuContent() {
+    return Container(
+      height: menuHeight,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          // 最近使用的两项
+          if (_isLoadingMentions) ...[
+            SizedBox(
+              height: 2 * itemHeight, // 两个项目的高度
+              child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+            _divider,
+          ] else if (_recentMentions.isEmpty) ...[
+            _buildNoRecentMentionsView(),
+            _divider,
+          ] else ...[
+            ..._buildRecentMentionsItems(),
+            _divider,
+          ],
+          // 常规选项
+          _buildMenuOption(
+            icon: Icons.note,
+            title: '笔记',
+            onTap: () {
+              // 切换到笔记列表模式
+              _switchToNotesMode();
+            },
+          ),
+          _divider,
+          _buildMenuOption(
+            icon: Icons.label,
+            title: '标签',
+            onTap: () {
+              // 切换到标签列表模式
+              _switchToTagsMode();
+            },
+          ),
+          _divider,
+          _buildMenuOption(
+            icon: Icons.location_on,
+            title: '地点',
+            onTap: () {
+              // 切换到地点列表模式
+              _switchToLocationsMode();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 构建无最近提及项目的视图
+  Widget _buildNoRecentMentionsView() {
+    return SizedBox(
+      height: 2 * itemHeight, // 两个项目的高度，不包括多余的分隔线
+      child: const Center(
+        child: Text(
+          '无最近提及项目',
+          style: TextStyle(fontSize: 14, color: Colors.black54),
+        ),
+      ),
+    );
+  }
+  
+  // 构建最近提及项目列表
+  List<Widget> _buildRecentMentionsItems() {
+    final List<Widget> items = [];
+    
+    for (int i = 0; i < _recentMentions.length; i++) {
+      final mention = _recentMentions[i];
+      
+      // 根据提及类型设置图标
+      IconData icon;
+      MentionType mentionType;
+      
+      switch (mention.type) {
+        case 'note':
+          icon = Icons.description;
+          mentionType = MentionType.note;
+          break;
+        case 'tag':
+          icon = Icons.label;
+          mentionType = MentionType.tag;
+          break;
+        case 'location':
+          icon = Icons.location_on;
+          mentionType = MentionType.location;
+          break;
+        default:
+          icon = Icons.history;
+          mentionType = MentionType.note;
+      }
+      
+      items.add(
+        _buildRecentItem(
+          icon: icon,
+          title: mention.title,
+          onTap: () {
+            widget.controller.hide();
+            widget.onItemSelected(
+              MentionItem(
+                id: mention.itemId,
+                title: mention.title,
+                type: mentionType,
+              ),
+            );
+          },
+        ),
+      );
+      
+      // 如果不是最后一项，添加分隔线
+      if (i < _recentMentions.length - 1) {
+        items.add(_divider);
+      }
+    }
+    
+    return items;
+  }
+
+  // 构建笔记列表内容
+  Widget _buildNotesListContent() {
+    if (_isLoading) {
+      return SizedBox(
+        height: menuHeight,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_notes.isEmpty) {
+      return SizedBox(
+        height: menuHeight,
+        child: const Center(child: Text('没有笔记', style: TextStyle(fontSize: 14, color: Colors.black54))),
+      );
+    }
+    
+    // 使用menuHeight作为总高度，保持一致性
+    return GestureDetector(
+      // 监听水平滑动手势
+      onHorizontalDragEnd: (DragEndDetails details) {
+        // 检测到右滑动作（primaryVelocity > 0）且速度超过阈值
+        if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+          // 返回主菜单
+          setState(() {
+            _currentMode = MenuMode.main;
+          });
+        }
+      },
+      child: Container(
+        height: menuHeight,
+        clipBehavior: Clip.none,
+        child: ListView.separated(
+          shrinkWrap: true,
+          physics: const ClampingScrollPhysics(),
+          padding: EdgeInsets.zero,
+          itemCount: _notes.length,
+          separatorBuilder: (_, __) => _divider,
+          itemBuilder: (context, index) {
+            final note = _notes[index];
+            return _buildNoteItem(note);
+          },
+        ),
+      ),
+    );
+  }
+
+  // 构建单个笔记项
+  Widget _buildNoteItem(Note note) {
+    // 截取标题，如果太长则显示省略号
+    String title = note.title;
+    if (title.length > 30) {
+      title = '${title.substring(0, 27)}...';
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          // 先关闭菜单
+          widget.controller.hide();
+          
+          // 然后触发回调
+          widget.onItemSelected(
+            MentionItem(
+              id: note.id.toString(),
+              title: note.title,
+              type: MentionType.note,
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          child: Row(
+            children: [
+              const Icon(Icons.description, size: 18, color: Colors.black54),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 构建最近使用的项目
+  Widget _buildRecentItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: Colors.black54),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -337,6 +715,12 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
                 title,
                 style: const TextStyle(fontSize: 14),
               ),
+              const Spacer(),
+              const Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: Colors.black38,
+              ),
             ],
           ),
         ),
@@ -345,6 +729,174 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   }
 
   Widget get _divider => const Divider(height: 1, thickness: 0.5, color: Color(0xFFEEEEEE));
+
+  // 构建标签列表内容
+  Widget _buildTagsListContent() {
+    if (_isLoadingTags) {
+      return SizedBox(
+        height: menuHeight,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_tags.isEmpty) {
+      return SizedBox(
+        height: menuHeight,
+        child: const Center(child: Text('没有标签', style: TextStyle(fontSize: 14, color: Colors.black54))),
+      );
+    }
+    
+    // 使用右滑返回功能
+    return GestureDetector(
+      // 监听水平滑动手势
+      onHorizontalDragEnd: (DragEndDetails details) {
+        // 检测到右滑动作（primaryVelocity > 0）且速度超过阈值
+        if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+          // 返回主菜单
+          setState(() {
+            _currentMode = MenuMode.main;
+          });
+        }
+      },
+      child: Container(
+        height: menuHeight,
+        clipBehavior: Clip.none,
+        child: ListView.separated(
+          shrinkWrap: true,
+          physics: const ClampingScrollPhysics(),
+          padding: EdgeInsets.zero,
+          itemCount: _tags.length,
+          separatorBuilder: (_, __) => _divider,
+          itemBuilder: (context, index) {
+            final tag = _tags[index];
+            return _buildTagItem(tag);
+          },
+        ),
+      ),
+    );
+  }
+  
+  // 构建单个标签项
+  Widget _buildTagItem(Tag tag) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          // 先关闭菜单
+          widget.controller.hide();
+          
+          // 然后触发回调
+          widget.onItemSelected(
+            MentionItem(
+              id: tag.name,
+              title: tag.name,
+              type: MentionType.tag,
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          child: Row(
+            children: [
+              const Icon(Icons.label, size: 18, color: Colors.black54),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  tag.name,
+                  style: const TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // 构建地点列表内容
+  Widget _buildLocationsListContent() {
+    if (_isLoadingLocations) {
+      return SizedBox(
+        height: menuHeight,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_locations.isEmpty) {
+      return SizedBox(
+        height: menuHeight,
+        child: const Center(child: Text('没有地点', style: TextStyle(fontSize: 14, color: Colors.black54))),
+      );
+    }
+    
+    // 使用右滑返回功能
+    return GestureDetector(
+      // 监听水平滑动手势
+      onHorizontalDragEnd: (DragEndDetails details) {
+        // 检测到右滑动作（primaryVelocity > 0）且速度超过阈值
+        if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+          // 返回主菜单
+          setState(() {
+            _currentMode = MenuMode.main;
+          });
+        }
+      },
+      child: Container(
+        height: menuHeight,
+        clipBehavior: Clip.none,
+        child: ListView.separated(
+          shrinkWrap: true,
+          physics: const ClampingScrollPhysics(),
+          padding: EdgeInsets.zero,
+          itemCount: _locations.length,
+          separatorBuilder: (_, __) => _divider,
+          itemBuilder: (context, index) {
+            final location = _locations[index];
+            return _buildLocationItem(location);
+          },
+        ),
+      ),
+    );
+  }
+  
+  // 构建单个地点项
+  Widget _buildLocationItem(String location) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          // 先关闭菜单
+          widget.controller.hide();
+          
+          // 然后触发回调
+          widget.onItemSelected(
+            MentionItem(
+              id: location,
+              title: location,
+              type: MentionType.location,
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          child: Row(
+            children: [
+              const Icon(Icons.location_on, size: 18, color: Colors.black54),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  location,
+                  style: const TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _MentionMenuState extends State<MentionMenu> {

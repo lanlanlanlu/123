@@ -1376,6 +1376,303 @@ class NoteImagesCompanion extends UpdateCompanion<NoteImage> {
   }
 }
 
+class $RecentMentionsTable extends RecentMentions
+    with TableInfo<$RecentMentionsTable, RecentMention> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RecentMentionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+      'type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
+      'item_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _usedAtMeta = const VerificationMeta('usedAt');
+  @override
+  late final GeneratedColumn<DateTime> usedAt = GeneratedColumn<DateTime>(
+      'used_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      clientDefault: () => DateTime.now());
+  @override
+  List<GeneratedColumn> get $columns => [id, type, itemId, title, usedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'recent_mentions';
+  @override
+  VerificationContext validateIntegrity(Insertable<RecentMention> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+          _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('item_id')) {
+      context.handle(_itemIdMeta,
+          itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta));
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('used_at')) {
+      context.handle(_usedAtMeta,
+          usedAt.isAcceptableOrUnknown(data['used_at']!, _usedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {type, itemId},
+      ];
+  @override
+  RecentMention map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RecentMention(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      type: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      itemId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}item_id'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      usedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}used_at'])!,
+    );
+  }
+
+  @override
+  $RecentMentionsTable createAlias(String alias) {
+    return $RecentMentionsTable(attachedDatabase, alias);
+  }
+}
+
+class RecentMention extends DataClass implements Insertable<RecentMention> {
+  final int id;
+  final String type;
+  final String itemId;
+  final String title;
+  final DateTime usedAt;
+  const RecentMention(
+      {required this.id,
+      required this.type,
+      required this.itemId,
+      required this.title,
+      required this.usedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['type'] = Variable<String>(type);
+    map['item_id'] = Variable<String>(itemId);
+    map['title'] = Variable<String>(title);
+    map['used_at'] = Variable<DateTime>(usedAt);
+    return map;
+  }
+
+  RecentMentionsCompanion toCompanion(bool nullToAbsent) {
+    return RecentMentionsCompanion(
+      id: Value(id),
+      type: Value(type),
+      itemId: Value(itemId),
+      title: Value(title),
+      usedAt: Value(usedAt),
+    );
+  }
+
+  factory RecentMention.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RecentMention(
+      id: serializer.fromJson<int>(json['id']),
+      type: serializer.fromJson<String>(json['type']),
+      itemId: serializer.fromJson<String>(json['itemId']),
+      title: serializer.fromJson<String>(json['title']),
+      usedAt: serializer.fromJson<DateTime>(json['usedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'type': serializer.toJson<String>(type),
+      'itemId': serializer.toJson<String>(itemId),
+      'title': serializer.toJson<String>(title),
+      'usedAt': serializer.toJson<DateTime>(usedAt),
+    };
+  }
+
+  RecentMention copyWith(
+          {int? id,
+          String? type,
+          String? itemId,
+          String? title,
+          DateTime? usedAt}) =>
+      RecentMention(
+        id: id ?? this.id,
+        type: type ?? this.type,
+        itemId: itemId ?? this.itemId,
+        title: title ?? this.title,
+        usedAt: usedAt ?? this.usedAt,
+      );
+  RecentMention copyWithCompanion(RecentMentionsCompanion data) {
+    return RecentMention(
+      id: data.id.present ? data.id.value : this.id,
+      type: data.type.present ? data.type.value : this.type,
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      title: data.title.present ? data.title.value : this.title,
+      usedAt: data.usedAt.present ? data.usedAt.value : this.usedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecentMention(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('itemId: $itemId, ')
+          ..write('title: $title, ')
+          ..write('usedAt: $usedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, type, itemId, title, usedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RecentMention &&
+          other.id == this.id &&
+          other.type == this.type &&
+          other.itemId == this.itemId &&
+          other.title == this.title &&
+          other.usedAt == this.usedAt);
+}
+
+class RecentMentionsCompanion extends UpdateCompanion<RecentMention> {
+  final Value<int> id;
+  final Value<String> type;
+  final Value<String> itemId;
+  final Value<String> title;
+  final Value<DateTime> usedAt;
+  const RecentMentionsCompanion({
+    this.id = const Value.absent(),
+    this.type = const Value.absent(),
+    this.itemId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.usedAt = const Value.absent(),
+  });
+  RecentMentionsCompanion.insert({
+    this.id = const Value.absent(),
+    required String type,
+    required String itemId,
+    required String title,
+    this.usedAt = const Value.absent(),
+  })  : type = Value(type),
+        itemId = Value(itemId),
+        title = Value(title);
+  static Insertable<RecentMention> custom({
+    Expression<int>? id,
+    Expression<String>? type,
+    Expression<String>? itemId,
+    Expression<String>? title,
+    Expression<DateTime>? usedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (type != null) 'type': type,
+      if (itemId != null) 'item_id': itemId,
+      if (title != null) 'title': title,
+      if (usedAt != null) 'used_at': usedAt,
+    });
+  }
+
+  RecentMentionsCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? type,
+      Value<String>? itemId,
+      Value<String>? title,
+      Value<DateTime>? usedAt}) {
+    return RecentMentionsCompanion(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      itemId: itemId ?? this.itemId,
+      title: title ?? this.title,
+      usedAt: usedAt ?? this.usedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (itemId.present) {
+      map['item_id'] = Variable<String>(itemId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (usedAt.present) {
+      map['used_at'] = Variable<DateTime>(usedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecentMentionsCompanion(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('itemId: $itemId, ')
+          ..write('title: $title, ')
+          ..write('usedAt: $usedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1384,6 +1681,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $NoteTagsTable noteTags = $NoteTagsTable(this);
   late final $NoteLocationsTable noteLocations = $NoteLocationsTable(this);
   late final $NoteImagesTable noteImages = $NoteImagesTable(this);
+  late final $RecentMentionsTable recentMentions = $RecentMentionsTable(this);
   late final NoteDao noteDao = NoteDao(this as AppDatabase);
   late final TagDao tagDao = TagDao(this as AppDatabase);
   @override
@@ -1391,7 +1689,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [notes, tags, noteTags, noteLocations, noteImages];
+      [notes, tags, noteTags, noteLocations, noteImages, recentMentions];
 }
 
 typedef $$NotesTableCreateCompanionBuilder = NotesCompanion Function({
@@ -2847,6 +3145,174 @@ typedef $$NoteImagesTableProcessedTableManager = ProcessedTableManager<
     (NoteImage, $$NoteImagesTableReferences),
     NoteImage,
     PrefetchHooks Function({bool noteId})>;
+typedef $$RecentMentionsTableCreateCompanionBuilder = RecentMentionsCompanion
+    Function({
+  Value<int> id,
+  required String type,
+  required String itemId,
+  required String title,
+  Value<DateTime> usedAt,
+});
+typedef $$RecentMentionsTableUpdateCompanionBuilder = RecentMentionsCompanion
+    Function({
+  Value<int> id,
+  Value<String> type,
+  Value<String> itemId,
+  Value<String> title,
+  Value<DateTime> usedAt,
+});
+
+class $$RecentMentionsTableFilterComposer
+    extends Composer<_$AppDatabase, $RecentMentionsTable> {
+  $$RecentMentionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get itemId => $composableBuilder(
+      column: $table.itemId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get usedAt => $composableBuilder(
+      column: $table.usedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$RecentMentionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $RecentMentionsTable> {
+  $$RecentMentionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get itemId => $composableBuilder(
+      column: $table.itemId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get usedAt => $composableBuilder(
+      column: $table.usedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$RecentMentionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RecentMentionsTable> {
+  $$RecentMentionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get usedAt =>
+      $composableBuilder(column: $table.usedAt, builder: (column) => column);
+}
+
+class $$RecentMentionsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $RecentMentionsTable,
+    RecentMention,
+    $$RecentMentionsTableFilterComposer,
+    $$RecentMentionsTableOrderingComposer,
+    $$RecentMentionsTableAnnotationComposer,
+    $$RecentMentionsTableCreateCompanionBuilder,
+    $$RecentMentionsTableUpdateCompanionBuilder,
+    (
+      RecentMention,
+      BaseReferences<_$AppDatabase, $RecentMentionsTable, RecentMention>
+    ),
+    RecentMention,
+    PrefetchHooks Function()> {
+  $$RecentMentionsTableTableManager(
+      _$AppDatabase db, $RecentMentionsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RecentMentionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RecentMentionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RecentMentionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> type = const Value.absent(),
+            Value<String> itemId = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<DateTime> usedAt = const Value.absent(),
+          }) =>
+              RecentMentionsCompanion(
+            id: id,
+            type: type,
+            itemId: itemId,
+            title: title,
+            usedAt: usedAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String type,
+            required String itemId,
+            required String title,
+            Value<DateTime> usedAt = const Value.absent(),
+          }) =>
+              RecentMentionsCompanion.insert(
+            id: id,
+            type: type,
+            itemId: itemId,
+            title: title,
+            usedAt: usedAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$RecentMentionsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $RecentMentionsTable,
+    RecentMention,
+    $$RecentMentionsTableFilterComposer,
+    $$RecentMentionsTableOrderingComposer,
+    $$RecentMentionsTableAnnotationComposer,
+    $$RecentMentionsTableCreateCompanionBuilder,
+    $$RecentMentionsTableUpdateCompanionBuilder,
+    (
+      RecentMention,
+      BaseReferences<_$AppDatabase, $RecentMentionsTable, RecentMention>
+    ),
+    RecentMention,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2860,6 +3326,8 @@ class $AppDatabaseManager {
       $$NoteLocationsTableTableManager(_db, _db.noteLocations);
   $$NoteImagesTableTableManager get noteImages =>
       $$NoteImagesTableTableManager(_db, _db.noteImages);
+  $$RecentMentionsTableTableManager get recentMentions =>
+      $$RecentMentionsTableTableManager(_db, _db.recentMentions);
 }
 
 mixin _$NoteDaoMixin on DatabaseAccessor<AppDatabase> {

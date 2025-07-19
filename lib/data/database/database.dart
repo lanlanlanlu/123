@@ -53,6 +53,22 @@ class NoteImages extends Table {
   TextColumn get path => text()(); // 存储图片的本地文件路径
 }
 
+// 【新增】用于存储最近@提及的项目
+@DataClassName('RecentMention')
+class RecentMentions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  // 提及类型: 'note', 'tag', 'location'
+  TextColumn get type => text()();
+  // 提及内容ID: 笔记ID、标签名称、地点名称
+  TextColumn get itemId => text()();
+  // 提及内容标题: 用于显示
+  TextColumn get title => text()();
+  // 使用时间
+  DateTimeColumn get usedAt => dateTime().clientDefault(() => DateTime.now())();
+  
+  @override
+  List<Set<Column>> get uniqueKeys => [{type, itemId}];
+}
 
 // --- 数据类 ---
 class NoteWithTags {
@@ -63,15 +79,15 @@ class NoteWithTags {
 
 // --- 数据库主类 ---
 @DriftDatabase(
-    tables: [Notes, Tags, NoteTags, NoteLocations, NoteImages], // 【修改】加入新表
+    tables: [Notes, Tags, NoteTags, NoteLocations, NoteImages, RecentMentions], // 【修改】加入新表
     daos: [NoteDao, TagDao]
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
-  // 【修改】schemaVersion 从 7 变为 8
+  // 【修改】schemaVersion 从 9 变为 10
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -104,7 +120,42 @@ class AppDatabase extends _$AppDatabase {
         if (from < 8) {
           await m.addColumn(notes, notes.thumbnailMode as GeneratedColumn<Object>);
         }
+        // 【新增】从版本 8 升级到 9 的逻辑：添加最近提及表
+        if (from < 9) {
+          await m.createTable(recentMentions);
+        }
+        // 【新增】从版本 9 升级到 10 的逻辑：重建最近提及表以添加唯一约束
+        if (from < 10) {
+          // 删除旧表并重新创建
+          await m.drop(recentMentions);
+          await m.createTable(recentMentions);
+        }
       },
     );
+  }
+
+  // 添加最近提及记录
+  Future<int> addRecentMention(RecentMentionsCompanion mention) {
+    return into(recentMentions).insert(
+      mention,
+      onConflict: DoUpdate((old) => mention.copyWith(usedAt: mention.usedAt), target: [recentMentions.type, recentMentions.itemId]),
+    );
+  }
+
+  // 获取最近提及记录
+  Future<List<RecentMention>> getRecentMentions({int limit = 2}) {
+    return (select(recentMentions)
+      ..orderBy([(t) => OrderingTerm(expression: t.usedAt, mode: OrderingMode.desc)])
+      ..limit(limit))
+      .get();
+  }
+
+  // 根据类型获取最近提及记录
+  Future<List<RecentMention>> getRecentMentionsByType(String type, {int limit = 2}) {
+    return (select(recentMentions)
+      ..where((t) => t.type.equals(type))
+      ..orderBy([(t) => OrderingTerm(expression: t.usedAt, mode: OrderingMode.desc)])
+      ..limit(limit))
+      .get();
   }
 }
