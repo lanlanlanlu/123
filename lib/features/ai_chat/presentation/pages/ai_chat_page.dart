@@ -220,13 +220,20 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
     
     // 显示新菜单，使用LayerLink进行精确定位
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 计算菜单应该显示的垂直偏移量
+      // 如果有提及项，上移菜单到更高的位置
+      final double verticalOffset = _mentionItems.isNotEmpty ? -50.0 : -5.0;
+      
+      // 获取水平距离，用于设置等于的垂直间距
+      final horizontalPadding = 10.0;
+      
       _menuController = MentionMenu.show(
         context: context, 
         layerLink: _inputFieldLayerLink,
         onItemSelected: _handleMentionSelected,
         onSearchSubmitted: _handleMentionSearchSubmitted,
-        verticalOffset: -5, // 向上偏移，显示在输入框上方
-        horizontalOffset: 10, // 水平偏移，使菜单与输入框有一定距离
+        verticalOffset: verticalOffset, // 根据是否有提及项动态调整垂直偏移
+        horizontalOffset: horizontalPadding, // 水平偏移，使菜单与输入框有一定距离
         menuWidth: 220.0,
         autofocus: false, // 禁用自动获取焦点，避免键盘问题
       );
