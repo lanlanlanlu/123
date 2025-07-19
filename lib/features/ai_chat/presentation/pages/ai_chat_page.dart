@@ -91,12 +91,19 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
       // 记录当前@的位置，避免重复触发
       _lastAtPosition = selection.baseOffset - 1;
       _showMentionMenu();
-    } else if (_lastAtPosition != -1 && 
-              (text.isEmpty || 
-               _lastAtPosition >= text.length || 
-               text[_lastAtPosition] != '@')) {
-      // 如果之前有@但现在被删除了，重置位置
-      _lastAtPosition = -1;
+    } else if (_lastAtPosition != -1) {
+      // 如果之前有@，检查是否需要关闭菜单
+      if (text.isEmpty || 
+          _lastAtPosition >= text.length || 
+          text[_lastAtPosition] != '@') {
+        // 如果@被删除，重置位置
+        _lastAtPosition = -1;
+        _hideMentionMenu();
+      } else if (selection.baseOffset > _lastAtPosition + 1) {
+        // 如果用户在@之后继续输入了其他字符，关闭菜单
+        // 但保留_lastAtPosition的值，避免重新触发菜单
+        _hideMentionMenu();
+      }
     }
     
     // 更新纯文本内容
@@ -201,14 +208,8 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
     // 更新纯文本内容
     _plainText = _textController.text;
     
-    // 异步记录最近使用的搜索提及，避免阻塞UI
-    Future.microtask(() {
-      _recentMentionsRepository.addRecentMention(
-        type: 'search',
-        itemId: text,
-        title: text,
-      );
-    });
+    // 不再将搜索提交的内容添加到最近提及数据库
+    // 只有通过菜单选择的项目才会被记录
   }
 
   void _showMentionMenu() {
