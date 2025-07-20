@@ -346,37 +346,73 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Container(
-                                  constraints: BoxConstraints(
-                                    maxWidth: MediaQuery.of(context).size.width * 0.7,
-                                  ),
-                                  padding: const EdgeInsets.all(12.0),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).primaryColor,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
+                            Container(
+                              constraints: BoxConstraints(
+                                maxWidth: MediaQuery.of(context).size.width * 0.8, // 修改为占屏幕宽度的4/5
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // 如果有提及项，显示提及项
+                                  if (message.customProperties != null && 
+                                      message.customProperties!.containsKey('mentionItems') &&
+                                      (message.customProperties!['mentionItems'] as List).isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8.0),
+                                      child: Wrap(
+                                        spacing: 4.0,
+                                        runSpacing: 4.0,
+                                        children: [
+                                          ...(message.customProperties!['mentionItems'] as List).map((item) {
+                                            final MentionType mentionType = MentionType.values[item['type'] as int];
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[100],
+                                                borderRadius: BorderRadius.circular(16),
+                                                border: Border.all(color: Colors.grey.withOpacity(0.3), width: 0.5),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    _getIconForMentionType(mentionType),
+                                                    size: 14,
+                                                    color: Theme.of(context).primaryColor,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    item['title'] as String,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      height: 1.0,
+                                                      color: Colors.black87,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }).toList(),
+                                        ],
+                                      ),
+                                    ),
+                                  
+                                  // 消息文本
+                                  Text(
                                     message.text,
                                     style: const TextStyle(
                                       fontSize: 14,
-                                      color: Colors.white,
+                                      color: Colors.black87,
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                CircleAvatar(
-                                  radius: 15,
-                                  backgroundColor: Theme.of(context).primaryColor,
-                                  child: const Icon(
-                                    Icons.person,
-                                    size: 18,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                             Padding(
                               padding: const EdgeInsets.only(top: 4.0, right: 4.0),
@@ -546,25 +582,23 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                             )
                                           ).toList();
                                           
-                                          // 在消息中添加引用标记，仅用于UI显示
-                                          for (var item in _mentionItems) {
-                                            final mentionText = switch (item.type) {
-                                              MentionType.note => '【笔记:${item.title}】',
-                                              MentionType.tag => '【标签:${item.title}】',
-                                              MentionType.location => '【地点:${item.title}】',
-                                            };
-                                            messageText = '$messageText $mentionText';
-                                          }
-                                          
-                                          // 创建消息对象
+                                          // 不再在消息文本中添加提及标记
+                                          // 使用原始纯文本作为消息文本
                                           final formattedMessage = messageText.trim();
                                           if (formattedMessage.isEmpty) return;
                                           
-                                          // 创建聊天消息
+                                          // 创建聊天消息，将提及项存储在customProperties中
                                           final chatMessage = ChatMessage(
                                             user: _currentUser,
                                             text: formattedMessage,
                                             createdAt: DateTime.now(),
+                                            customProperties: {
+                                              'mentionItems': _mentionItems.map((item) => {
+                                                'id': item.id,
+                                                'title': item.title,
+                                                'type': item.type.index,
+                                              }).toList(),
+                                            },
                                           );
                                           
                                           // 发送消息和引用对象
