@@ -238,11 +238,11 @@ class PropertyGraphBuilder:
                     if head and rel_type and tail:
                         # 创建自定义关系（使用标准Cypher而不是apoc）
                         # 清理关系类型，移除特殊字符，只保留字母、数字和下划线
-                        rel_type_clean = ''.join(c for c in rel_type if c.isalnum() or c == ' ' or c == '_')
+                        rel_type_clean = ''.join(c for c in rel_type if c.isalnum() or c == '_')
                         # 确保不为空，否则使用默认关系类型
                         if not rel_type_clean.strip():
                             rel_type_clean = "RELATES_TO"
-                        rel_type_upper = rel_type_clean.upper().replace(" ", "_")
+                        rel_type_upper = rel_type_clean.upper()
                         session.run(f"""
                             MATCH (a), (b)
                             WHERE a.name = $head AND b.name = $tail

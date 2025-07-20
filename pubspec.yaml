@@ -22,6 +22,10 @@ dependencies:
   provider: ^6.1.2
   equatable: ^2.0.7
 
+  # Code generation
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.8.1
+
   # Database
   drift: ^2.18.0
   sqlite3_flutter_libs: ^0.5.24
@@ -69,6 +73,8 @@ dev_dependencies:
   drift_dev: ^2.18.0
   build_runner: ^2.4.11
   flutter_lints: ^4.0.0
+  freezed: ^2.4.7
+  json_serializable: ^6.7.1
 
 flutter:
   uses-material-design: true

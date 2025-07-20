@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
 
 import 'package:record_app/data/repository/ai_chat_repository.dart'; // 引入 Repository
+import 'package:record_app/data/models/chat_reference.dart'; // 引入引用模型
 import 'ai_chat_event.dart';
 import 'ai_chat_state.dart';
 
@@ -52,8 +53,11 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
     ));
       
     try {
-      // 2. 调用 Repository 发送网络请求
-      final aiTextResponse = await aiChatRepository.getAiResponse(event.message.text);
+      // 2. 调用 Repository 发送网络请求，传递引用对象
+      final aiTextResponse = await aiChatRepository.getAiResponse(
+        event.message.text,
+        references: event.references,
+      );
       
       final aiResponse = ChatMessage(
         user: _systemUser,

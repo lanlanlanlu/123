@@ -18,6 +18,31 @@ from utils.geocoding import extract_locations_from_text, enhance_location_metada
 from utils.entity_extractor import extract_entities_from_query
 from utils.graph_builder import PropertyGraphBuilder
 
+# 导入从ingest.py中的转换函数
+def convert_delta_to_plain_text(delta_json_string: str) -> str:
+    """
+    将Quill编辑器的Delta JSON格式转换为纯文本
+    """
+    if not delta_json_string or delta_json_string.strip() == '[]':
+        return ""
+    try:
+        # 尝试直接解析JSON
+        ops = json.loads(delta_json_string)
+        if not isinstance(ops, list): return ""
+    except json.JSONDecodeError:
+        # 如果直接解析失败，说明它可能是一个纯文本字符串
+        return delta_json_string.strip()
+        
+    text_parts = []
+    for op in ops:
+        if isinstance(op, dict) and 'insert' in op:
+            if isinstance(op['insert'], str):
+                text_parts.append(op['insert'])
+            # 也可以处理图片等其他嵌入类型，但这里我们只关心文本
+    
+    result = "".join(text_parts).strip()
+    return result
+
 # 我们只从核心包导入
 from llama_index.core import (
     StorageContext,
@@ -263,8 +288,16 @@ def startup_event():
         print(f"加载索引时发生错误: {e}")
         index = None
 
+# 修改聊天请求模型，支持引用对象
+class ChatReference(BaseModel):
+    id: str  # 引用ID
+    title: str  # 引用标题/名称
+    type: str  # 引用类型: note, tag, location
+    content: Optional[str] = None  # 引用内容 
+
 class ChatRequest(BaseModel):
     query: str
+    references: List[ChatReference] = []
     use_rerank: bool = True       # 是否在检索后使用重排序
     rerank_language: str = "auto"  # 重排序语言: auto, english, multilingual
     use_graph: bool = None        # 是否使用图检索，None表示自动决定
@@ -274,6 +307,7 @@ class ChatRequest(BaseModel):
 async def handle_chat_request(request: ChatRequest):
     """
     处理聊天请求，使用混合搜索模式并支持重排序和图检索:
+    - references: 引用列表，包含笔记、标签和地点的引用
     - use_rerank: 是否对检索结果进行重排序
     - rerank_language: 重排序使用的语言模型，可选 auto, english, multilingual
     - use_graph: 是否使用图检索，可选true, false, null(自动决定)
@@ -284,18 +318,78 @@ async def handle_chat_request(request: ChatRequest):
         raise HTTPException(status_code=400, detail="查询不能为空。")
 
     print(f"\n{'='*50}\n收到原始查询: {request.query}")
-
+    
+    # 处理引用内容
+    user_specified_context = ""
     
     # 2. 从查询中提取实体
     entities = extract_entities_from_query(request.query, llm=Settings.llm)
-    print(f"提取到的实体: {entities}")
-
+    print(f"从查询中提取到的实体: {entities}")
+    
+    # 处理引用对象，将标签和地点直接添加到实体中，笔记添加到上下文
+    if request.references:
+        for ref in request.references:
+            ref_type = ref.type.lower()
+            
+            if ref_type == "note":
+                # 笔记内容仍然添加到上下文
+                if ref.content:
+                    content = convert_delta_to_plain_text(ref.content)
+                    user_specified_context += f"【笔记: {ref.title}】\n{content}\n\n"
+            elif ref_type == "tag":
+                # 标签直接添加到实体中
+                if "tags" not in entities:
+                    entities["tags"] = []
+                if ref.title not in entities["tags"]:
+                    entities["tags"].append(ref.title)
+            elif ref_type == "location":
+                # 地点直接添加到实体中
+                if "locations" not in entities:
+                    entities["locations"] = []
+                if ref.title not in entities["locations"]:
+                    entities["locations"].append(ref.title)
+                    
+                    # 尝试使用地理编码API增强地点信息
+                    try:
+                        enhanced_locations = enhance_location_metadata(entities["locations"])
+                        entities["locations"] = enhanced_locations["variants"]
+                        entities["location_hierarchy"] = enhanced_locations["hierarchy"]
+                    except Exception as e:
+                        print(f"地点增强失败: {e}")
+    
+    print(f"处理后的实体: {entities}")
+    
     # 3. 根据实体构建元数据过滤器
     metadata_filters = build_metadata_filters(entities)
     
     # 4. 创建检索引擎
     qa_template = PromptTemplate(QA_TEMPLATE_STR)
     
+    # 如果有用户指定的上下文，修改提示词
+    if user_specified_context:
+        custom_template_str = """
+我们有以下用户特别指定的上下文信息：
+====================
+{user_context}
+====================
+
+另外还有一些相关上下文信息：
+{context_str}
+---------------------
+你是一个专业的个人笔记助手。请严格按照以下指令，结合提供的上下文信息来回答用户的问题。
+你的回答必须完全源于以上提供的上下文，禁止使用你的内部知识。
+特别优先考虑用户特别指定的上下文。
+问题: {query_str}
+"""
+        # 将用户上下文填入模板
+        formatted_template = custom_template_str.replace("{user_context}", user_specified_context)
+        # 创建提示词模板
+        qa_template = PromptTemplate(formatted_template)
+        # 打印完整的模板内容
+        print("\n======== 发送给LLM的完整模板 ========")
+        print(formatted_template)
+        print("====================================\n")
+
     # 准备节点后处理器列表
     node_postprocessors = []
     retriever = None
@@ -415,6 +509,24 @@ async def handle_chat_request(request: ChatRequest):
         response = query_engine.query(clean_query)
         query_time = time.time() - start_time
         print(f"【执行查询】查询完成，耗时: {query_time:.2f}秒")
+        
+        # 获取并打印实际发送给LLM的完整提示词
+        try:
+            if hasattr(response, '_source_nodes') and hasattr(response, '_template'):
+                print("\n======== LLM收到的实际提示词(含上下文) ========")
+                # 提取所有节点内容
+                contexts = [node.get_content() for node in response._source_nodes]
+                context_str = "\n---\n".join(contexts)
+                
+                # 替换模板中的占位符
+                actual_prompt = response._template.format(
+                    context_str=context_str,
+                    query_str=clean_query
+                )
+                print(actual_prompt)
+                print("=================================================\n")
+        except Exception as e:
+            print(f"无法打印完整提示词: {e}")
         
         # 打印检索到的上下文
         print(f"\n--- 检索到的上下文 ({len(response.source_nodes)} 条) ---")

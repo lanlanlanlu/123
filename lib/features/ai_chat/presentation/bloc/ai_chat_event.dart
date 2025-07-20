@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:dash_chat_2/dash_chat_2.dart';
+import 'package:record_app/data/models/chat_reference.dart';
 
 abstract class AiChatEvent extends Equatable {
   const AiChatEvent();
@@ -14,11 +15,12 @@ class AiChatInitialized extends AiChatEvent {
 
 class AiChatMessageSent extends AiChatEvent {
   final ChatMessage message;
+  final List<ChatReference> references;
   
-  const AiChatMessageSent(this.message);
+  const AiChatMessageSent(this.message, {this.references = const []});
   
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, references];
 }
 
 class AiChatCleared extends AiChatEvent {

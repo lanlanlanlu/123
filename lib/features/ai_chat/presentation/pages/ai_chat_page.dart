@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:record_app/data/repository/ai_chat_repository.dart';
 import 'package:flutter/rendering.dart';
 import 'package:record_app/data/repository/recent_mentions_repository.dart';
+import 'package:record_app/data/models/chat_reference.dart';
 
 /// AI聊天页面
 class AiChatPage extends StatefulWidget {
@@ -45,6 +46,18 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
   
   // 输入框中的文本，用于管理带@提及的内容
   String _plainText = '';
+  
+  // 将MentionType转换为ReferenceType
+  ReferenceType _convertMentionTypeToReferenceType(MentionType type) {
+    switch (type) {
+      case MentionType.note:
+        return ReferenceType.note;
+      case MentionType.tag:
+        return ReferenceType.tag;
+      case MentionType.location:
+        return ReferenceType.location;
+    }
+  }
 
   @override
   void initState() {
@@ -121,17 +134,8 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
   void _handleSendMessage(String message) {
     if (message.trim().isEmpty) return;
     
-    final chatMessage = ChatMessage(
-      user: _currentUser,
-      text: message,
-      createdAt: DateTime.now(),
-    );
-    
-    // 从 context 中读取由 BlocProvider 提供的 BLoC 实例
-    context.read<AiChatBloc>().add(AiChatMessageSent(chatMessage));
+    // 清除@提及项列表和输入框
     _textController.clear();
-    
-    // 清除@提及项列表
     setState(() {
       _mentionItems.clear();
       _plainText = '';
@@ -532,6 +536,17 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                       : () {
                                           // 构建发送文本：结合纯文本和@提及项
                                           String messageText = _plainText;
+                                          
+                                          // 创建引用对象列表
+                                          final references = _mentionItems.map((item) => 
+                                            ChatReference(
+                                              id: item.id,
+                                              title: item.title,
+                                              type: _convertMentionTypeToReferenceType(item.type),
+                                            )
+                                          ).toList();
+                                          
+                                          // 在消息中添加引用标记，仅用于UI显示
                                           for (var item in _mentionItems) {
                                             final mentionText = switch (item.type) {
                                               MentionType.note => '【笔记:${item.title}】',
@@ -540,7 +555,29 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                             };
                                             messageText = '$messageText $mentionText';
                                           }
-                                          _handleSendMessage(messageText.trim());
+                                          
+                                          // 创建消息对象
+                                          final formattedMessage = messageText.trim();
+                                          if (formattedMessage.isEmpty) return;
+                                          
+                                          // 创建聊天消息
+                                          final chatMessage = ChatMessage(
+                                            user: _currentUser,
+                                            text: formattedMessage,
+                                            createdAt: DateTime.now(),
+                                          );
+                                          
+                                          // 发送消息和引用对象
+                                          context.read<AiChatBloc>().add(
+                                            AiChatMessageSent(chatMessage, references: references)
+                                          );
+                                          
+                                          // 清理UI状态
+                                          _textController.clear();
+                                          setState(() {
+                                            _mentionItems.clear();
+                                            _plainText = '';
+                                          });
                                         },
                                   padding: EdgeInsets.zero,
                                 ),
