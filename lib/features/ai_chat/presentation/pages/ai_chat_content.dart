@@ -74,6 +74,15 @@ class _AiChatContentState extends State<AiChatContent> {
     });
   }
   
+  // 聊天清除回调
+  void _onChatCleared() {
+    debugPrint('AiChatContent: _onChatCleared() - 聊天被清除，重置历史ID');
+    // 重置聊天历史ID
+    setState(() {
+      _chatHistoryId = null;
+    });
+  }
+  
   /// 防抖保存聊天
   void _debouncedSaveChat() {
     if (_isSaving || _aiChatBloc == null) return; // 如果正在保存，则跳过
@@ -228,11 +237,17 @@ class _AiChatContentState extends State<AiChatContent> {
       } else {
         // 创建新的聊天历史
         debugPrint('AiChatContent: _saveChat() - 创建新的聊天历史，消息数: ${messages.length}');
-        _chatHistoryId = await chatHistoryRepository.saveChat(
+        final historyId = await chatHistoryRepository.saveChat(
           title: title,
           messages: messages,
         );
-        debugPrint('AiChatContent: _saveChat() - 创建了新的聊天历史: $_chatHistoryId');
+        
+        // 保存ID并且不要重新初始化AiChatBloc
+        setState(() {
+          _chatHistoryId = historyId;
+        });
+        
+        debugPrint('AiChatContent: _saveChat() - 创建了新的聊天历史: $_chatHistoryId，保持当前消息状态');
       }
     } catch (e) {
       debugPrint('AiChatContent: _saveChat() - 保存聊天历史失败: $e');
@@ -255,19 +270,58 @@ class _AiChatContentState extends State<AiChatContent> {
       ],
       child: Builder(
         builder: (context) {
-          // 创建AiChatBloc
-          final aiChatBloc = AiChatBloc(
-            // 从上下文中读取并注入 Repository
-            aiChatRepository: context.read<AiChatRepository>(),
-            // 添加消息变更回调
-            onMessageAdded: _onMessageAdded,
-          )..add(const AiChatInitialized());
-          
-          // 保存引用
-          _aiChatBloc = aiChatBloc;
+          // 如果_aiChatBloc已经存在，继续使用它，避免重新创建
+          if (_aiChatBloc == null) {
+            debugPrint('AiChatContent: build() - 创建新的AiChatBloc');
+            
+            // 创建新的AiChatBloc
+            final newBloc = AiChatBloc(
+              aiChatRepository: context.read<AiChatRepository>(),
+              onMessageAdded: _onMessageAdded,
+              onChatCleared: _onChatCleared, // 添加清除回调
+            );
+            
+            // 保存引用
+            _aiChatBloc = newBloc;
+            
+            // 根据_chatHistoryId状态决定如何初始化
+            if (_chatHistoryId != null) {
+              // 如果有聊天历史ID，从数据库加载历史消息
+              debugPrint('AiChatContent: build() - 加载历史消息，ID: $_chatHistoryId');
+              
+              // 在构建完成后异步加载历史消息
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                try {
+                  // 获取历史记录
+                  final chatHistory = await _chatHistoryRepository.getChatHistoryWithMessages(_chatHistoryId!);
+                  // 转换为dash_chat格式的消息
+                  final messages = _chatHistoryRepository.convertToMessages(chatHistory.messages);
+                  
+                  // 用历史消息初始化
+                  if (messages.isNotEmpty && _aiChatBloc != null) {
+                    debugPrint('AiChatContent: 加载了 ${messages.length} 条历史消息');
+                    _aiChatBloc!.add(AiChatInitializedWithHistory(messages));
+                  } else {
+                    // 如果没有历史消息，空初始化
+                    _aiChatBloc!.add(const AiChatInitialized());
+                  }
+                } catch (e) {
+                  debugPrint('AiChatContent: 加载历史消息失败: $e');
+                  // 出错时，空初始化
+                  _aiChatBloc!.add(const AiChatInitialized());
+                }
+              });
+            } else {
+              // 没有历史ID，空初始化
+              debugPrint('AiChatContent: build() - 空初始化');
+              newBloc.add(const AiChatInitialized());
+            }
+          } else {
+            debugPrint('AiChatContent: build() - 复用现有AiChatBloc');
+          }
           
           return BlocProvider(
-            create: (_) => aiChatBloc,
+            create: (_) => _aiChatBloc!,
             child: Material(
               type: MaterialType.transparency,
               child: const AiChatPage(),

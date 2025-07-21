@@ -87,6 +87,12 @@ class _CustomAiChatWithHistoryState extends State<_CustomAiChatWithHistory> {
     });
   }
   
+  // 聊天清除回调 - 对于聊天历史页面，不重置历史ID，因为是固定的
+  void _onChatCleared() {
+    debugPrint('ChatHistoryPage: _onChatCleared() - 聊天被清除，但保留历史ID: $_chatHistoryId');
+    // 对于历史页面，不需要重置chatHistoryId
+  }
+
   /// 防抖保存聊天
   void _debouncedSaveChat() {
     if (_isSaving || _aiChatBloc == null) return;
@@ -240,6 +246,7 @@ class _CustomAiChatWithHistoryState extends State<_CustomAiChatWithHistory> {
           final aiChatBloc = AiChatBloc(
             aiChatRepository: context.read<AiChatRepository>(),
             onMessageAdded: _onMessageAdded, // 设置消息变更回调
+            onChatCleared: _onChatCleared, // 添加清除回调
           )..add(AiChatInitializedWithHistory(widget.initialMessages));
           
           // 保存引用

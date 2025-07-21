@@ -16,8 +16,15 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
   
   // 消息变更回调
   MessageChangeCallback? onMessageAdded;
+  
+  // 清除聊天回调
+  VoidCallback? onChatCleared;
 
-  AiChatBloc({required this.aiChatRepository, this.onMessageAdded}) : super(const AiChatState()) {
+  AiChatBloc({
+    required this.aiChatRepository, 
+    this.onMessageAdded,
+    this.onChatCleared,
+  }) : super(const AiChatState()) {
     on<AiChatInitialized>(_onInitialized);
     on<AiChatInitializedWithHistory>(_onInitializedWithHistory); // 处理带历史消息的初始化
     on<AiChatMessageSent>(_onMessageSent); // 对应你的 AiChatMessageSent 事件
@@ -124,6 +131,12 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
       isLoading: false,
       clearError: true,
     ));
+    
+    // 调用外部清除回调
+    if (onChatCleared != null) {
+      debugPrint('AiChatBloc: 调用清除回调');
+      onChatCleared!();
+    }
   }
   
   // 安全地调用消息添加回调，不会阻塞主线程
