@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:dash_chat_2/dash_chat_2.dart';
+import 'package:dash_chat_2/dash_chat_2.dart' as dash;
 import '../bloc/ai_chat_bloc.dart';
 import '../bloc/ai_chat_event.dart';
 import '../bloc/ai_chat_state.dart';
@@ -12,6 +12,8 @@ import 'package:record_app/data/repository/ai_chat_repository.dart';
 import 'package:flutter/rendering.dart';
 import 'package:record_app/data/repository/recent_mentions_repository.dart';
 import 'package:record_app/data/models/chat_reference.dart';
+import 'package:record_app/data/repository/chat_history_repository.dart';
+import 'package:record_app/data/database/database.dart';
 
 /// AI聊天页面
 class AiChatPage extends StatefulWidget {
@@ -33,7 +35,7 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
   MentionMenuController? _menuController;
   
   // 当前用户（使用dash_chat_2中的ChatUser）
-  final ChatUser _currentUser = ChatUser(
+  final dash.ChatUser _currentUser = dash.ChatUser(
     id: 'user_1', 
     firstName: '我'
   );
@@ -41,11 +43,20 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
   // 最近提及仓库
   final RecentMentionsRepository _recentMentionsRepository = RecentMentionsRepository();
 
+  // 聊天历史仓库
+  late final ChatHistoryRepository _chatHistoryRepository;
+
+  // 保存对话的ID，如果创建了新的历史记录
+  int? _savedChatHistoryId;
+
   // 存储@提及项目的列表
   final List<MentionItem> _mentionItems = [];
   
   // 输入框中的文本，用于管理带@提及的内容
   String _plainText = '';
+  
+  // 记录上一次状态中的消息数量，用于检测新消息
+  int _lastMessageCount = 0;
   
   // 将MentionType转换为ReferenceType
   ReferenceType _convertMentionTypeToReferenceType(MentionType type) {
@@ -63,15 +74,57 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     
+    // 初始化聊天历史仓库
+    _chatHistoryRepository = ChatHistoryRepository(context.read<AppDatabase>());
+    
     // 添加观察者以监听键盘变化
     WidgetsBinding.instance.addObserver(this);
     
     // 添加文本监听器
     _textController.addListener(_onTextChanged);
+    
+    // 尝试创建聊天历史相关的表
+    _ensureChatTables();
+  }
+  
+  /// 确保聊天历史表存在
+  Future<void> _ensureChatTables() async {
+    try {
+      final database = context.read<AppDatabase>();
+      await database.customStatement('''
+      CREATE TABLE IF NOT EXISTS chat_histories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        last_message TEXT,
+        message_count INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+      ''');
+      
+      await database.customStatement('''
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_history_id INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        sender TEXT NOT NULL,
+        mention_items TEXT,
+        sequence_number INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (chat_history_id) REFERENCES chat_histories (id)
+      )
+      ''');
+      debugPrint('聊天历史表检查/创建完成');
+    } catch (e) {
+      debugPrint('确保聊天历史表存在时出错: $e');
+    }
   }
 
   @override
   void dispose() {
+    // 在页面关闭时保存聊天记录，如果有消息的话
+    _saveChat();
+    
     // 移除观察者
     WidgetsBinding.instance.removeObserver(this);
     _textController.removeListener(_onTextChanged);
@@ -80,6 +133,76 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
     _focusNode.dispose();
     _hideMentionMenu();
     super.dispose();
+  }
+  
+  /// 保存当前聊天到历史记录
+  Future<void> _saveChat() async {
+    // 获取当前消息列表
+    final messages = context.read<AiChatBloc>().state.messages;
+    
+    // 打印当前要保存的消息列表信息
+    debugPrint('保存聊天历史，消息总数: ${messages.length}');
+    for (int i = 0; i < messages.length; i++) {
+      final msg = messages[i];
+      debugPrint('消息[$i]: 发送者=${msg.user.id}, 时间=${msg.createdAt}, 内容长度=${msg.text.length}');
+    }
+    
+    // 只有当有消息且不是只有欢迎消息时才保存
+    if (messages.length <= 1) {
+      debugPrint('消息数量不足，不保存聊天历史');
+      return;
+    }
+    
+    try {
+      // 创建标题 - 使用第一条用户消息作为标题，或第一条消息的前20个字符
+      String title = '新对话';
+      for (final message in messages) {
+        if (message.user.id == 'user_1') {
+          title = message.text.length > 20 
+              ? '${message.text.substring(0, 20)}...' 
+              : message.text;
+          break;
+        }
+      }
+      
+      // 确保标题不为空
+      if (title.trim().isEmpty) {
+        title = '新对话';
+      }
+      
+      // 如果已经保存过，则更新
+      if (_savedChatHistoryId != null) {
+        // 获取最新消息
+        final lastMessage = messages.last;
+        
+        debugPrint('更新聊天历史: $_savedChatHistoryId，最新消息发送者: ${lastMessage.user.id}');
+        
+        // 更新历史记录
+        await _chatHistoryRepository.updateChatHistory(
+          _savedChatHistoryId!,
+          title,  // 确保title被正确传递
+          lastMessage.text,
+          messages.length,
+        );
+        
+        // 添加新消息
+        await _chatHistoryRepository.addMessageToHistory(
+          historyId: _savedChatHistoryId!,
+          message: lastMessage,
+        );
+        debugPrint('更新了聊天历史: $_savedChatHistoryId');
+      } else {
+        // 创建新的聊天历史
+        debugPrint('创建新的聊天历史，消息数: ${messages.length}');
+        _savedChatHistoryId = await _chatHistoryRepository.saveChat(
+          title: title,  // 确保title被正确传递
+          messages: messages,
+        );
+        debugPrint('创建了新的聊天历史: $_savedChatHistoryId');
+      }
+    } catch (e) {
+      debugPrint('保存聊天历史失败: $e');
+    }
   }
   
   @override
@@ -280,6 +403,9 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
               );
             }
           });
+          
+          // 不在这里实时保存消息，依靠AiChatContent中的保存逻辑
+          _lastMessageCount = state.messages.length;
         },
         builder: (context, state) {
           return Container(
@@ -588,7 +714,7 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                           if (formattedMessage.isEmpty) return;
                                           
                                           // 创建聊天消息，将提及项存储在customProperties中
-                                          final chatMessage = ChatMessage(
+                                          final chatMessage = dash.ChatMessage(
                                             user: _currentUser,
                                             text: formattedMessage,
                                             createdAt: DateTime.now(),

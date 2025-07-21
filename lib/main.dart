@@ -17,6 +17,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 late final AppDatabase _database;
 late final NotesRepository _notesRepository;
 late final TagsRepository _tagsRepository;
+late final ChatHistoryRepository _chatHistoryRepository;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +43,7 @@ Future<void> _initializeDependencies() async {
   // 2. 初始化仓库
   _notesRepository = NotesRepository(_database);
   _tagsRepository = TagsRepository(_database);
+  _chatHistoryRepository = ChatHistoryRepository(_database);
 }
 
 /// 在UI渲染后安排数据库维护任务
@@ -55,11 +57,54 @@ void _scheduleDatabaseMaintenance() {
       await _database.customStatement(
         'UPDATE notes SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL'
       );
-      debugPrint('Database maintenance completed');
+      
+      // 确保聊天历史相关表存在
+      await _ensureChatHistoryTables();
+      
+      debugPrint('数据库维护完成');
     } catch (e) {
-      debugPrint('Failed to run database maintenance: $e');
+      debugPrint('运行数据库维护失败: $e');
     }
   });
+}
+
+/// 确保聊天历史表存在
+Future<void> _ensureChatHistoryTables() async {
+  try {
+    // 尝试查询聊天历史表，如果失败表示表不存在
+    await _database.customStatement('SELECT 1 FROM chat_histories LIMIT 1');
+    debugPrint('聊天历史表已存在');
+  } catch (e) {
+    debugPrint('聊天历史表不存在，正在创建...');
+    
+    // 创建聊天历史表
+    await _database.customStatement('''
+    CREATE TABLE IF NOT EXISTS chat_histories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      last_message TEXT,
+      message_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+    ''');
+    
+    // 创建聊天消息表
+    await _database.customStatement('''
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chat_history_id INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      sender TEXT NOT NULL,
+      mention_items TEXT,
+      sequence_number INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (chat_history_id) REFERENCES chat_histories (id)
+    )
+    ''');
+    
+    debugPrint('聊天历史表创建完成');
+  }
 }
 
 /// 应用根Widget
@@ -120,6 +165,11 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         // 标签仓库
         RepositoryProvider<TagsRepository>(
           create: (context) => _tagsRepository,
+          lazy: false,
+        ),
+        // 聊天历史仓库
+        RepositoryProvider<ChatHistoryRepository>(
+          create: (context) => _chatHistoryRepository,
           lazy: false,
         ),
         // 为了兼容性，提供旧的Repository类

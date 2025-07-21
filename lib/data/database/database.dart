@@ -70,6 +70,39 @@ class RecentMentions extends Table {
   List<Set<Column>> get uniqueKeys => [{type, itemId}];
 }
 
+// 【新增】用于存储聊天历史会话
+@DataClassName('ChatHistory')
+class ChatHistories extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  // 会话标题
+  TextColumn get title => text().withLength(max: 255)();
+  // 最后一条消息预览
+  TextColumn get lastMessage => text().withLength(max: 255).nullable()();
+  // 消息数量
+  IntColumn get messageCount => integer().withDefault(const Constant(0))();
+  // 创建和更新时间
+  DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now())();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now())();
+}
+
+// 【新增】用于存储聊天消息
+@DataClassName('ChatMessage')
+class ChatMessages extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  // 关联到哪个聊天历史
+  IntColumn get chatHistoryId => integer().references(ChatHistories, #id)();
+  // 消息内容
+  TextColumn get content => text()();
+  // 发送者 (user 或 ai)
+  TextColumn get sender => text()();
+  // 消息中包含的@提及项JSON格式
+  TextColumn get mentionItems => text().nullable()();
+  // 消息在对话中的序列号
+  IntColumn get sequenceNumber => integer()();
+  // 创建时间
+  DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now())();
+}
+
 // --- 数据类 ---
 class NoteWithTags {
   final Note note;
@@ -77,17 +110,33 @@ class NoteWithTags {
   NoteWithTags({required this.note, required this.tags});
 }
 
+// 【新增】聊天历史记录与消息的关联数据类
+class ChatHistoryWithMessages {
+  final ChatHistory chatHistory;
+  final List<ChatMessage> messages;
+  ChatHistoryWithMessages({required this.chatHistory, required this.messages});
+}
+
 // --- 数据库主类 ---
 @DriftDatabase(
-    tables: [Notes, Tags, NoteTags, NoteLocations, NoteImages, RecentMentions], // 【修改】加入新表
+    tables: [
+      Notes, 
+      Tags, 
+      NoteTags, 
+      NoteLocations, 
+      NoteImages, 
+      RecentMentions,
+      ChatHistories, // 【新增】聊天历史表
+      ChatMessages, // 【新增】聊天消息表
+    ], 
     daos: [NoteDao, TagDao]
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
-  // 【修改】schemaVersion 从 9 变为 10
+  // 【修改】schemaVersion 从 10 变为 11，添加聊天历史相关表
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration {
@@ -130,6 +179,11 @@ class AppDatabase extends _$AppDatabase {
           await m.drop(recentMentions);
           await m.createTable(recentMentions);
         }
+        // 【新增】从版本 10 升级到 11 的逻辑：添加聊天历史和消息表
+        if (from < 11) {
+          await m.createTable(chatHistories);
+          await m.createTable(chatMessages);
+        }
       },
     );
   }
@@ -157,5 +211,47 @@ class AppDatabase extends _$AppDatabase {
       ..orderBy([(t) => OrderingTerm(expression: t.usedAt, mode: OrderingMode.desc)])
       ..limit(limit))
       .get();
+  }
+
+  // 【新增】获取所有聊天历史
+  Future<List<ChatHistory>> getAllChatHistories() {
+    return (select(chatHistories)
+      ..orderBy([(t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc)]))
+      .get();
+  }
+  
+  // 【新增】通过ID获取聊天历史
+  Future<ChatHistory> getChatHistoryById(int id) {
+    return (select(chatHistories)..where((t) => t.id.equals(id))).getSingle();
+  }
+  
+  // 【新增】获取聊天历史的所有消息
+  Future<List<ChatMessage>> getChatMessagesByHistoryId(int historyId) {
+    return (select(chatMessages)
+      ..where((t) => t.chatHistoryId.equals(historyId))
+      ..orderBy([(t) => OrderingTerm(expression: t.sequenceNumber)]))
+      .get();
+  }
+  
+  // 【新增】创建新的聊天历史
+  Future<int> createChatHistory(ChatHistoriesCompanion history) {
+    return into(chatHistories).insert(history);
+  }
+  
+  // 【新增】添加聊天消息
+  Future<int> addChatMessage(ChatMessagesCompanion message) {
+    return into(chatMessages).insert(message);
+  }
+  
+  // 【新增】更新聊天历史
+  Future<bool> updateChatHistory(ChatHistoriesCompanion history) {
+    return update(chatHistories).replace(history);
+  }
+  
+  // 【新增】获取聊天历史及其所有消息
+  Future<ChatHistoryWithMessages> getChatHistoryWithMessages(int historyId) async {
+    final history = await getChatHistoryById(historyId);
+    final messages = await getChatMessagesByHistoryId(historyId);
+    return ChatHistoryWithMessages(chatHistory: history, messages: messages);
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/ai_chat_bloc.dart';
 import '../bloc/ai_chat_event.dart';
+import '../../presentation/pages/chat_history_list_page.dart'; // 导入聊天历史列表页面
 
 /// AI聊天页面的AppBar
 class AiChatAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -13,6 +14,17 @@ class AiChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.history),
+        onPressed: () {
+          // 导航到聊天历史列表页面
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const ChatHistoryListPage(),
+            ),
+          );
+        },
+      ),
       title: const Text('AI助手'),
       centerTitle: true,
       actions: [

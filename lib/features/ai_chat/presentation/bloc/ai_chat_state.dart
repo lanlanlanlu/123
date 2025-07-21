@@ -1,8 +1,8 @@
 import 'package:equatable/equatable.dart';
-import 'package:dash_chat_2/dash_chat_2.dart';
+import 'package:dash_chat_2/dash_chat_2.dart' as dash;
 
 class AiChatState extends Equatable {
-  final List<ChatMessage> messages;
+  final List<dash.ChatMessage> messages;
   final bool isLoading;
   final String? error;
   
@@ -13,7 +13,7 @@ class AiChatState extends Equatable {
   });
   
   AiChatState copyWith({
-    List<ChatMessage>? messages,
+    List<dash.ChatMessage>? messages,
     bool? isLoading,
     String? error,
     bool clearError = false,
