@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart'; // 添加Provider导入
 import 'package:record_app/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:record_app/features/home/presentation/pages/home_page.dart';
 import 'package:record_app/features/ai_chat/presentation/pages/ai_chat_content.dart';
@@ -16,6 +17,7 @@ import 'package:record_app/features/calendar/presentation/bloc/calendar_event.da
 import 'package:record_app/features/calendar/presentation/bloc/calendar_state.dart';
 import 'package:record_app/data/repository/notes_repository.dart';
 import 'package:record_app/data/repository/repository.dart';
+import 'package:record_app/data/repository/ai_chat_repository.dart'; // 导入AiChatRepository
 
 /// 草稿键值常量
 const String DRAFT_KEY = 'note_draft';
@@ -35,6 +37,8 @@ class _MainShellPageState extends State<MainShellPage> {
   late final List<Widget> _pageContents;
   // Bloc Providers
   late final CalendarBloc _calendarBloc;
+  // 添加AI聊天仓库
+  late final AiChatRepository _aiChatRepository;
 
   @override
   void initState() {
@@ -49,6 +53,9 @@ class _MainShellPageState extends State<MainShellPage> {
     _calendarBloc = CalendarBloc(
       repository: context.read<Repository>(),
     )..add(const CalendarLoadNotes());
+    
+    // 初始化AI聊天仓库
+    _aiChatRepository = AiChatRepository();
     
     _pageContents = [
       const HomeContent(),
@@ -109,7 +116,14 @@ class _MainShellPageState extends State<MainShellPage> {
           ),
         );
       case 2:
-        return const AiChatAppBar();
+        // 为AI聊天AppBar提供AiChatRepository
+        return PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Provider<AiChatRepository>.value(
+            value: _aiChatRepository,
+            child: const AiChatAppBar(),
+          ),
+        );
       case 3:
         return AppBar(
           title: const Text('设置'),
@@ -139,7 +153,11 @@ class _MainShellPageState extends State<MainShellPage> {
                   value: _calendarBloc,
                   child: _pageContents[1],
                 ),
-                _pageContents[2],
+                // 为AI聊天内容提供AiChatRepository
+                Provider<AiChatRepository>.value(
+                  value: _aiChatRepository,
+                  child: _pageContents[2],
+                ),
                 _pageContents[3],
               ],
             ),

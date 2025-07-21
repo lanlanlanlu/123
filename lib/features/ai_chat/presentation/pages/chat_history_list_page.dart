@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/repository/ai_chat_repository.dart';
 import 'package:record_app/data/repository/chat_history_repository.dart';
 import 'package:intl/intl.dart';
 import 'chat_history_detail_page.dart';
@@ -89,6 +91,9 @@ class _ChatHistoryListPageState extends State<ChatHistoryListPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 获取AiChatRepository实例
+    final aiChatRepository = context.read<AiChatRepository>();
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('聊天历史'),
@@ -112,7 +117,7 @@ class _ChatHistoryListPageState extends State<ChatHistoryListPage> {
                 itemCount: _histories.length,
                 itemBuilder: (context, index) {
                   final history = _histories[index];
-                  return _buildHistoryItem(history);
+                  return _buildHistoryItem(history, aiChatRepository);
                 },
               ),
             ),
@@ -153,15 +158,18 @@ class _ChatHistoryListPageState extends State<ChatHistoryListPage> {
   }
   
   /// 构建历史记录项
-  Widget _buildHistoryItem(ChatHistory history) {
+  Widget _buildHistoryItem(ChatHistory history, AiChatRepository aiChatRepository) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
       child: InkWell(
         onTap: () {
-          // 导航到聊天历史详情页面
+          // 导航到聊天历史详情页面，并提供AiChatRepository
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => ChatHistoryDetailPage(historyId: history.id),
+              builder: (context) => Provider<AiChatRepository>.value(
+                value: aiChatRepository,
+                child: ChatHistoryDetailPage(historyId: history.id),
+              ),
             ),
           ).then((_) => _loadHistories()); // 返回时刷新列表
         },
