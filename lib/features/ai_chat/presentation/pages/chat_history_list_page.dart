@@ -247,6 +247,7 @@ class _CustomAiChatWithHistoryState extends State<_CustomAiChatWithHistory> {
             aiChatRepository: context.read<AiChatRepository>(),
             onMessageAdded: _onMessageAdded, // 设置消息变更回调
             onChatCleared: _onChatCleared, // 添加清除回调
+            chatHistoryId: _chatHistoryId.toString(), // 传入聊天ID
           )..add(AiChatInitializedWithHistory(widget.initialMessages));
           
           // 保存引用
@@ -260,7 +261,11 @@ class _CustomAiChatWithHistoryState extends State<_CustomAiChatWithHistory> {
                 centerTitle: true,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.of(context).pop(),
+                  // 使用Navigator.pushReplacement替代pop，确保返回到聊天历史页面
+                  onPressed: () {
+                    // 使用简单的pop返回，因为前一页面应该是聊天历史列表
+                    Navigator.of(context).pop();
+                  },
                 ),
               ),
               body: const AiChatPage(),

@@ -23,6 +23,9 @@ class ChatRequest with _$ChatRequest {
     
     /// 是否使用图谱 - 默认自动决定
     bool? useGraph,
+    
+    /// 聊天ID - 用于记忆功能
+    @Default('') String chatId,
   }) = _ChatRequest;
   
   /// 从JSON创建

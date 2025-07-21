@@ -3,7 +3,7 @@
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import re
 import json
 import time  # 添加time模块导入
@@ -18,6 +18,7 @@ from utils.geocoding import extract_locations_from_text, enhance_location_metada
 # 导入图谱相关工具
 from utils.entity_extractor import extract_entities_from_query
 from utils.graph_builder import PropertyGraphBuilder
+from utils.chat_memory import ChatMemoryManager
 
 # 导入从ingest.py中的转换函数
 def convert_delta_to_plain_text(delta_json_string: str) -> str:
@@ -75,6 +76,7 @@ from llama_index.postprocessor.cohere_rerank import CohereRerank
 # 引入图存储和知识图谱索引
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
 from llama_index.core.query_engine.retriever_query_engine import RetrieverQueryEngine
+from llama_index.core.llms import MessageRole
 
 # --- 配置与初始化 ---
 PERSIST_DIR = "./storage"
@@ -138,6 +140,19 @@ def initialize_embed_model():
         embed_batch_size=100,
         api_key=api_key,
     )
+
+# 初始化记忆管理器（在其他初始化代码后面）
+try:
+    # 使用绝对路径初始化记忆管理器
+    import os
+    memory_storage_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage", "memories")
+    # 确保目录存在
+    os.makedirs(memory_storage_path, exist_ok=True)
+    memory_manager = ChatMemoryManager(storage_dir=memory_storage_path)
+    print(f"记忆管理器初始化成功，存储路径: {memory_storage_path}")
+except Exception as e:
+    print(f"记忆管理器初始化失败: {e}")
+    memory_manager = None
 
 # 初始化模型
 try:
@@ -342,29 +357,94 @@ class ChatReference(BaseModel):
     type: str  # 引用类型: note, tag, location
     content: Optional[str] = None  # 引用内容 
 
+# 修改ChatRequest模型，增加chat_id字段
 class ChatRequest(BaseModel):
     query: str
     references: List[ChatReference] = []
     use_rerank: bool = True       # 是否在检索后使用重排序
     rerank_language: str = "auto"  # 重排序语言: auto, english, multilingual
     use_graph: bool = None        # 是否使用图检索，None表示自动决定
+    
+    # 使用Field指定别名，将前端的chatId映射到后端的chat_id
+    chat_id: str = Field(default="", alias="chatId")  # 聊天ID，用于记忆功能
+    
+    class Config:
+        populate_by_name = True  # 允许通过别名填充字段
 
 # --- API 端点 ---
+# 添加几个记忆管理的API端点
+@app.post("/api/memory/save")
+async def save_memory(chat_id: str, messages: List[Dict[str, Any]]):
+    """保存对话记忆"""
+    if not memory_manager:
+        raise HTTPException(status_code=503, detail="记忆管理服务不可用")
+    
+    success = memory_manager.save_memory(chat_id, messages)
+    if success:
+        return {"status": "success", "message": f"成功保存对话 {chat_id} 的记忆"}
+    else:
+        raise HTTPException(status_code=500, detail="保存记忆失败")
+
+@app.get("/api/memory/{chat_id}")
+async def get_memory(chat_id: str):
+    """获取对话记忆"""
+    if not memory_manager:
+        raise HTTPException(status_code=503, detail="记忆管理服务不可用")
+    
+    memory_content = memory_manager.get_memory_content(chat_id)
+    return memory_content
+
+@app.delete("/api/memory/{chat_id}")
+async def delete_memory(chat_id: str):
+    """删除对话记忆"""
+    if not memory_manager:
+        raise HTTPException(status_code=503, detail="记忆管理服务不可用")
+    
+    success = memory_manager.delete_memory(chat_id)
+    if success:
+        return {"status": "success", "message": f"成功删除对话 {chat_id} 的记忆"}
+    else:
+        raise HTTPException(status_code=500, detail="删除记忆失败")
+
+@app.get("/api/memories")
+async def list_memories():
+    """列出所有记忆的对话ID"""
+    if not memory_manager:
+        raise HTTPException(status_code=503, detail="记忆管理服务不可用")
+    
+    memories = memory_manager.list_memories()
+    return {"memories": memories}
+
+# 修改聊天API，支持记忆功能
 @app.post("/api/chat")
 async def handle_chat_request(request: ChatRequest):
     """
-    处理聊天请求，使用混合搜索模式并支持重排序和图检索:
+    处理聊天请求，使用混合搜索模式并支持重排序、图检索和记忆功能:
     - references: 引用列表，包含笔记、标签和地点的引用
     - use_rerank: 是否对检索结果进行重排序
     - rerank_language: 重排序使用的语言模型，可选 auto, english, multilingual
     - use_graph: 是否使用图检索，可选true, false, null(自动决定)
+    - chat_id: 聊天ID，用于记忆功能
     """
+    # 添加详细的请求调试信息
+    print(f"\n【请求调试】原始请求数据: {request}")
+    print(f"【请求调试】chat_id值: '{request.chat_id}'")
+    print(f"【请求调试】请求模型字段: {request.__fields__.keys()}")
+    
     if index is None:
         raise HTTPException(status_code=503, detail="服务不可用：索引未初始化。")
     if not request.query:
         raise HTTPException(status_code=400, detail="查询不能为空。")
 
     print(f"\n{'='*50}\n收到原始查询: {request.query}")
+    print(f"聊天ID: {request.chat_id}")
+    
+    # 加载记忆（如果有chat_id）
+    memory = None
+    if memory_manager and request.chat_id:
+        memory = memory_manager.load_memory(request.chat_id)
+        if memory:
+            print(f"成功加载对话 {request.chat_id} 的记忆")
     
     # 处理引用内容
     user_specified_context = ""
@@ -417,10 +497,22 @@ async def handle_chat_request(request: ChatRequest):
     # 4. 创建检索引擎
     qa_template = PromptTemplate(QA_TEMPLATE_STR)
     
-    # 如果有用户指定的上下文，修改提示词
-    if user_specified_context:
+    # 如果有记忆，将其插入到提示词中
+    memory_context = ""
+    if memory:
+        memory_messages = memory.get()
+        if memory_messages and memory_messages[0].role == MessageRole.SYSTEM:
+            memory_context = memory_messages[0].content
+            print(f"插入记忆到系统提示词: {memory_context[:100]}...")
+    
+    # 如果有用户指定的上下文或记忆，修改提示词
+    if user_specified_context or memory_context:
         custom_template_str = """
-我们有以下用户特别指定的上下文信息：
+我们有以下背景信息：
+
+{memory_context}
+
+以及用户特别指定的上下文信息：
 ====================
 {user_context}
 ====================
@@ -433,8 +525,10 @@ async def handle_chat_request(request: ChatRequest):
 特别优先考虑用户特别指定的上下文。
 问题: {query_str}
 """
-        # 将用户上下文填入模板
+        # 填充模板
         formatted_template = custom_template_str.replace("{user_context}", user_specified_context)
+        formatted_template = formatted_template.replace("{memory_context}", memory_context)
+        
         # 创建提示词模板
         qa_template = PromptTemplate(formatted_template)
         # 打印完整的模板内容
@@ -638,6 +732,98 @@ async def handle_chat_request(request: ChatRequest):
         # 获取响应文本
         full_response_text = response.response
         print(f"生成的回答: {full_response_text}")
+        
+        # 最后，当成功获取响应后，保存记忆（如果有chat_id）
+        if request.chat_id:
+            print(f"\n【记忆管理】准备保存对话，chat_id: '{request.chat_id}'")
+            
+            # 检查chat_id是否为有效值
+            if not request.chat_id.strip():
+                print("【记忆管理】chat_id为空，跳过记忆保存")
+                return {"response": full_response_text}
+            
+            # 如果查询中包含已知人名，特别标注在记忆中
+            known_people = []
+            if entities.get("people"):
+                known_people = entities.get("people")
+                print(f"【记忆管理】检测到人名：{known_people}")
+                
+            # 创建更丰富的用户消息和AI回复
+            user_message = {
+                "role": "user", 
+                "content": request.query,
+                "metadata": {"mentioned_people": known_people} if known_people else {}
+            }
+            
+            ai_message = {
+                "role": "assistant", 
+                "content": response.response
+            }
+            
+            # 打印详细的记忆信息以进行调试
+            print(f"【记忆管理】即将保存的消息: \n - 用户: {request.query}\n - AI: {response.response[:50]}...")
+            
+            # 保存到记忆
+            if memory_manager:
+                try:
+                    # 首先检查是否有现有记忆
+                    print(f"【记忆管理】检查是否存在现有记忆: '{request.chat_id}'")
+                    existing_memory = memory_manager.get_memory_content(request.chat_id)
+                    
+                    if existing_memory and existing_memory.get("messages"):
+                        msg_count = len(existing_memory.get("messages", []))
+                        print(f"【记忆管理】找到现有记忆，包含 {msg_count} 条消息")
+                        
+                        # 确保不重复保存相同消息
+                        all_messages = existing_memory.get("messages", [])
+                        
+                        # 检查这条消息是否已存在
+                        message_exists = False
+                        for msg in all_messages:
+                            if (msg.get("role") == "user" and 
+                                msg.get("content") == user_message["content"]):
+                                message_exists = True
+                                break
+                        
+                        if not message_exists:
+                            # 如果消息不存在，则追加新消息
+                            all_messages.append(user_message)
+                            all_messages.append(ai_message)
+                            success = memory_manager.save_memory(request.chat_id, all_messages)
+                            print(f"【记忆管理】添加新消息并保存记忆：{success}")
+                        else:
+                            print("【记忆管理】消息已存在，跳过保存")
+                    else:
+                        # 如果没有现有记忆，创建新记忆
+                        print(f"【记忆管理】没有找到现有记忆，创建新记忆")
+                        success = memory_manager.save_memory(request.chat_id, [user_message, ai_message])
+                        print(f"【记忆管理】创建新记忆：{success}")
+                    
+                    # 验证保存结果
+                    memory_content = memory_manager.get_memory_content(request.chat_id)
+                    msg_count = len(memory_content.get("messages", []))
+                    facts_count = len(memory_content.get("facts", []))
+                    print(f"【记忆管理】保存后的记忆包含 {msg_count} 条消息, {facts_count} 条事实")
+                    print(f"【记忆管理】存储路径: {memory_manager.storage_dir}/{request.chat_id}.json")
+                    
+                    # 检查文件是否实际存在
+                    import os
+                    memory_file = os.path.join(memory_manager.storage_dir, f"{request.chat_id}.json")
+                    if os.path.exists(memory_file):
+                        file_size = os.path.getsize(memory_file)
+                        print(f"【记忆管理】确认文件已创建: {memory_file}, 大小: {file_size} 字节")
+                    else:
+                        print(f"【记忆管理】警告: 文件未成功创建: {memory_file}")
+                        
+                except Exception as e:
+                    print(f"【记忆管理】保存记忆失败: {e}")
+                    import traceback
+                    print(f"【记忆管理】详细错误: {traceback.format_exc()}")
+            else:
+                print("【记忆管理】警告: memory_manager为None，无法保存记忆")
+        else:
+            print("【记忆管理】警告: 请求中没有提供chat_id，跳过记忆保存")
+        
         return {"response": full_response_text}
         
     except ValueError as e:

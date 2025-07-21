@@ -19,16 +19,28 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
   
   // 清除聊天回调
   VoidCallback? onChatCleared;
+  
+  // 添加聊天ID
+  String? chatHistoryId;
 
   AiChatBloc({
     required this.aiChatRepository, 
     this.onMessageAdded,
     this.onChatCleared,
+    this.chatHistoryId,
   }) : super(const AiChatState()) {
     on<AiChatInitialized>(_onInitialized);
     on<AiChatInitializedWithHistory>(_onInitializedWithHistory); // 处理带历史消息的初始化
     on<AiChatMessageSent>(_onMessageSent); // 对应你的 AiChatMessageSent 事件
     on<AiChatCleared>(_onChatCleared);
+    
+    // 如果没有提供chatHistoryId，生成一个固定的默认ID
+    if (chatHistoryId == null || chatHistoryId!.isEmpty) {
+      chatHistoryId = 'default_chat_${DateTime.now().millisecondsSinceEpoch}';
+      debugPrint('AiChatBloc: 未提供chatHistoryId，创建默认ID: $chatHistoryId');
+    } else {
+      debugPrint('AiChatBloc: 使用提供的chatHistoryId: $chatHistoryId');
+    }
   }
 
   // 系统用户（AI助手）
@@ -88,11 +100,23 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
     // 不在这里调用消息添加回调，只在成功获得AI响应后调用
       
     try {
-      // 2. 调用 Repository 发送网络请求，传递引用对象
+      // 确保聊天ID有值
+      final String chatId = chatHistoryId ?? 'default_chat_${DateTime.now().millisecondsSinceEpoch}';
+      debugPrint('AiChatBloc: 发送消息，使用聊天ID: $chatId');
+      
+      // 打印更多调试信息
+      debugPrint('AiChatBloc: 用户消息: ${event.message.text}');
+      debugPrint('AiChatBloc: 引用数量: ${event.references?.length ?? 0}');
+      
+      // 2. 调用 Repository 发送网络请求，传递引用对象和聊天ID
+      debugPrint('AiChatBloc: 开始调用API...');
       final aiTextResponse = await aiChatRepository.getAiResponse(
         event.message.text,
         references: event.references,
+        chatId: chatId, // 传递聊天ID
       );
+      
+      debugPrint('AiChatBloc: API调用成功，响应长度: ${aiTextResponse.length}');
       
       // 创建AI回复消息
       final aiResponse = dash.ChatMessage(
@@ -108,9 +132,12 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
       ));
       
       // 用户消息和AI回复都添加后调用回调，触发保存逻辑
+      debugPrint('AiChatBloc: 准备调用消息添加回调...');
       _safeCallMessageAddedCallback();
+      debugPrint('AiChatBloc: 消息添加回调调用完成');
     } catch (e) {
       // 4. 如果网络请求失败，显示错误信息
+      debugPrint('AiChatBloc: API调用失败: $e');
       emit(state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -119,34 +146,27 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
       // 请求失败时不保存消息，移除对_safeCallMessageAddedCallback的调用
     }
   }
-
+  
   void _onChatCleared(
     AiChatCleared event,
     Emitter<AiChatState> emit,
   ) {
-    // 清除所有消息，不添加欢迎消息
-    debugPrint('AiChatBloc: 清除所有消息');
-    emit(state.copyWith(
-      messages: [], // 空消息列表
-      isLoading: false,
-      clearError: true,
-    ));
+    // 清除聊天记录
+    emit(state.copyWith(messages: []));
     
-    // 调用外部清除回调
+    // 如果有注册清除回调，则调用
     if (onChatCleared != null) {
-      debugPrint('AiChatBloc: 调用清除回调');
       onChatCleared!();
     }
   }
   
-  // 安全地调用消息添加回调，不会阻塞主线程
   void _safeCallMessageAddedCallback() {
-    if (onMessageAdded == null) return;
-    
-    // 增加延迟时间确保状态更新完成
-    Future.delayed(const Duration(milliseconds: 500), () {
-      debugPrint('AiChatBloc: 调用消息添加回调，触发保存逻辑');
-      onMessageAdded?.call();
-    });
+    try {
+      if (onMessageAdded != null) {
+        onMessageAdded!();
+      }
+    } catch (e) {
+      debugPrint('AiChatBloc: 消息变更回调执行错误: $e');
+    }
   }
 }

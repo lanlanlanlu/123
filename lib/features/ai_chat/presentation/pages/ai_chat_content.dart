@@ -279,6 +279,7 @@ class _AiChatContentState extends State<AiChatContent> {
               aiChatRepository: context.read<AiChatRepository>(),
               onMessageAdded: _onMessageAdded,
               onChatCleared: _onChatCleared, // 添加清除回调
+              chatHistoryId: _chatHistoryId?.toString(), // 传入聊天历史ID，转为字符串
             );
             
             // 保存引用

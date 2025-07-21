@@ -631,6 +631,10 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                             _mentionItems.clear();
                                             _plainText = '';
                                           });
+                                          
+                                          // 调试: 打印当前使用的聊天ID
+                                          final bloc = context.read<AiChatBloc>();
+                                          debugPrint('AiChatPage: 发送消息，使用聊天ID：${bloc.chatHistoryId}');
                                         },
                                   padding: EdgeInsets.zero,
                                 ),

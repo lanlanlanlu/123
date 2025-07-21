@@ -36,28 +36,49 @@ class AiChatRepository {
   }
 
   // 发送问题并获取AI的回答
-  Future<String> getAiResponse(String query, {List<ChatReference>? references}) async {
+  Future<String> getAiResponse(
+    String query, 
+    {List<ChatReference>? references, String? chatId}
+  ) async {
     try {
+      // 打印详细的调试信息
+      print('AiChatRepository: 开始处理请求');
+      print('AiChatRepository: 查询: $query');
+      print('AiChatRepository: 聊天ID: ${chatId ?? "未提供"}');
+      print('AiChatRepository: 引用数量: ${references?.length ?? 0}');
+      
       // 处理引用，填充内容
       List<ChatReference> enrichedReferences = [];
       if (references != null && references.isNotEmpty) {
+        print('AiChatRepository: 开始丰富引用内容...');
         enrichedReferences = await _enrichReferences(references);
+        print('AiChatRepository: 引用丰富完成，丰富后数量: ${enrichedReferences.length}');
       }
       
       // 创建请求对象
       final chatRequest = ChatRequest(
         query: query,
         references: enrichedReferences,
+        chatId: chatId ?? '', // 添加聊天ID，如果没有则使用空字符串
       );
+      
+      // 打印完整请求对象（转为JSON）用于调试
+      print('AiChatRepository: 请求对象: ${chatRequest.toJson()}');
+      print('AiChatRepository: API基础URL: $_apiBaseUrl');
 
+      print('AiChatRepository: 开始发送POST请求...');
       final response = await _dio.post(
         '$_apiBaseUrl/api/chat',
         data: chatRequest.toJson(),
       );
+      print('AiChatRepository: 收到响应，状态码: ${response.statusCode}');
 
       if (response.statusCode == 200 && response.data != null) {
         // 解析后端返回的 JSON 数据
-        return response.data['response'] ?? '抱歉，未能解析返回结果。';
+        print('AiChatRepository: 响应数据: ${response.data}');
+        final result = response.data['response'] ?? '抱歉，未能解析返回结果。';
+        print('AiChatRepository: 解析后的响应: ${result.substring(0, result.length > 50 ? 50 : result.length)}...');
+        return result;
       } else {
         throw Exception('服务器返回了错误状态: ${response.statusCode}');
       }
@@ -69,9 +90,11 @@ class AiChatRepository {
       } else {
         errorMessage += '\nDio 错误: ${e.message}';
       }
+      print('AiChatRepository: DIO错误: $errorMessage');
       throw Exception(errorMessage);
     } catch (e) {
       // 处理其他未知错误
+      print('AiChatRepository: 未知错误: $e');
       throw Exception('发生未知错误: $e');
     }
   }
