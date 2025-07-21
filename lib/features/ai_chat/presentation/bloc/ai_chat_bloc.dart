@@ -36,15 +36,10 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
     AiChatInitialized event,
     Emitter<AiChatState> emit,
   ) {
-    // 初始化逻辑保持不变
-    final welcomeMessage = dash.ChatMessage(
-      user: _systemUser,
-      text: '你好！我是你的AI笔记助手。你可以向我询问关于你笔记的任何问题。',
-      createdAt: DateTime.now(),
-    );
-    
+    // 初始化但不添加欢迎消息，直接发出一个空消息列表的状态
+    debugPrint('AiChatBloc: 初始化');
     emit(state.copyWith(
-      messages: [welcomeMessage],
+      messages: [],  // 空消息列表
       isLoading: false,
     ));
   }
@@ -55,12 +50,17 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
   ) {
     // 使用提供的历史消息初始化
     if (event.messages.isEmpty) {
-      // 如果没有历史消息，则使用默认欢迎消息
-      _onInitialized(const AiChatInitialized(), emit);
+      // 如果没有历史消息，则使用空列表初始化，不再添加欢迎消息
+      emit(state.copyWith(
+        messages: [],
+        isLoading: false,
+      ));
+      debugPrint('AiChatBloc: 使用历史初始化，但历史为空');
       return;
     }
     
     // 使用历史消息初始化状态
+    debugPrint('AiChatBloc: 使用历史初始化，消息数: ${event.messages.length}');
     emit(state.copyWith(
       messages: event.messages,
       isLoading: false,
@@ -78,8 +78,7 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
       clearError: true,
     ));
     
-    // 不再在这里调用消息添加回调
-    // 而是在收到AI回复后一起调用，这样可以一次性保存用户消息和AI回复
+    // 不在这里调用消息添加回调，只在成功获得AI响应后调用
       
     try {
       // 2. 调用 Repository 发送网络请求，传递引用对象
@@ -110,8 +109,7 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
         error: e.toString(),
       ));
       
-      // 即使请求失败，也应该保存用户发送的消息
-      _safeCallMessageAddedCallback();
+      // 请求失败时不保存消息，移除对_safeCallMessageAddedCallback的调用
     }
   }
 
@@ -119,15 +117,10 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
     AiChatCleared event,
     Emitter<AiChatState> emit,
   ) {
-    // 清除逻辑保持不变
-    final welcomeMessage = dash.ChatMessage(
-      user: _systemUser,
-      text: '聊天记录已清除。有什么我可以帮你的吗？',
-      createdAt: DateTime.now(),
-    );
-    
+    // 清除所有消息，不添加欢迎消息
+    debugPrint('AiChatBloc: 清除所有消息');
     emit(state.copyWith(
-      messages: [welcomeMessage],
+      messages: [], // 空消息列表
       isLoading: false,
       clearError: true,
     ));
@@ -137,9 +130,9 @@ class AiChatBloc extends Bloc<AiChatEvent, AiChatState> {
   void _safeCallMessageAddedCallback() {
     if (onMessageAdded == null) return;
     
-    // 使用延迟的Future确保回调在消息处理完成后执行
-    // 增加延迟时间以确保状态完全更新后再触发回调
-    Future.delayed(const Duration(milliseconds: 300), () {
+    // 增加延迟时间确保状态更新完成
+    Future.delayed(const Duration(milliseconds: 500), () {
+      debugPrint('AiChatBloc: 调用消息添加回调，触发保存逻辑');
       onMessageAdded?.call();
     });
   }

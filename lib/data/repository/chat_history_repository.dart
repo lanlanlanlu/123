@@ -148,6 +148,7 @@ class ChatHistoryRepository {
   Future<void> addMessageToHistory({
     required int historyId,
     required dash.ChatMessage message,
+    int? sequenceNumber,
   }) async {
     await _database.transaction(() async {
       try {
@@ -155,9 +156,13 @@ class ChatHistoryRepository {
         final messages = await _database.getChatMessagesByHistoryId(historyId);
         final historyWithMessages = await _database.getChatHistoryWithMessages(historyId);
         final existingTitle = historyWithMessages.chatHistory.title;
-        final sequenceNumber = messages.isNotEmpty 
+        
+        // 如果没有提供序列号，则使用自动计算的值
+        final actualSequenceNumber = sequenceNumber ?? (messages.isNotEmpty 
             ? messages.last.sequenceNumber + 1 
-            : 0;
+            : 0);
+        
+        debugPrint('添加消息到聊天历史，ID: $historyId, 序列号: $actualSequenceNumber, 发送者: ${message.user.id}');
         
         // 2. 添加消息
         // 将@提及项转换为JSON字符串
@@ -176,7 +181,7 @@ class ChatHistoryRepository {
             content: message.text,
             sender: message.user.id,
             mentionItems: Value(mentionItemsJson),
-            sequenceNumber: sequenceNumber,
+            sequenceNumber: actualSequenceNumber,
             createdAt: Value(message.createdAt),
           ),
         );
@@ -194,7 +199,7 @@ class ChatHistoryRepository {
           ),
         );
         
-        debugPrint('成功添加了消息到聊天历史: $historyId');
+        debugPrint('成功添加了消息到聊天历史: $historyId, 序列号: $actualSequenceNumber');
       } catch (e) {
         debugPrint('添加消息出错: $e');
         rethrow;

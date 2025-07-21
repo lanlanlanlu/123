@@ -9,6 +9,7 @@ import json
 import time  # 添加time模块导入
 from datetime import datetime  # 添加datetime导入
 from typing import List, Dict, Any, Optional
+import tenacity  # 添加tenacity模块用于重试功能
 
 # 导入工具类
 from utils.date_utils import convert_timestamp_to_date_str
@@ -92,19 +93,65 @@ NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 
-llm = GoogleGenAI(
-    model="gemini-1.5-flash",
-    api_key=api_key,
-)
-embed_model = GoogleGenAIEmbedding(
-    model_name="text-embedding-004",
-    embed_batch_size=100,
-    api_key=api_key,
+# 定义Gemini模型列表（从最优先到最不优先）
+GEMINI_MODELS = [
+    "gemini-2.5-flash",  # 首选模型
+    "gemini-2.5-pro",    # 备用模型1
+    "gemini-2.0-flash",    # 备用模型2
+]
+
+# 定义重试装饰器
+retry_on_model_overload = tenacity.retry(
+    reraise=True,
+    stop=tenacity.stop_after_attempt(3),  # 最多重试3次
+    wait=tenacity.wait_exponential(multiplier=1, min=1, max=10),  # 指数退避
+    retry=tenacity.retry_if_exception_message(match="model is overloaded")  # 仅在模型过载时重试
 )
 
-# 设置全局默认模型
-Settings.llm = llm
-Settings.embed_model = embed_model
+# 初始化LLM模型(带重试)
+@retry_on_model_overload
+def initialize_llm():
+    """初始化LLM模型，带有重试逻辑"""
+    for model_name in GEMINI_MODELS:
+        try:
+            print(f"尝试初始化模型: {model_name}")
+            return GoogleGenAI(
+                model=model_name,
+                api_key=api_key,
+                temperature=0.7,
+                retry_on_failure=True,  # 开启内部重试逻辑
+                max_retries=2  # 设置最大重试次数
+            )
+        except Exception as e:
+            print(f"初始化 {model_name} 失败: {e}")
+            continue
+    
+    # 如果所有模型都失败
+    raise ValueError("所有Gemini模型初始化失败")
+
+# 初始化嵌入模型
+@retry_on_model_overload
+def initialize_embed_model():
+    """初始化嵌入模型，带有重试逻辑"""
+    return GoogleGenAIEmbedding(
+        model_name="text-embedding-004",
+        embed_batch_size=100,
+        api_key=api_key,
+    )
+
+# 初始化模型
+try:
+    llm = initialize_llm()
+    embed_model = initialize_embed_model()
+    
+    # 设置全局默认模型
+    Settings.llm = llm
+    Settings.embed_model = embed_model
+    
+    print(f"AI 模型初始化成功，使用模型: {llm.model}")
+except Exception as e:
+    print(f"初始化AI模型失败: {e}")
+    raise
 
 app = FastAPI()
 # 将索引加载到全局
@@ -322,9 +369,14 @@ async def handle_chat_request(request: ChatRequest):
     # 处理引用内容
     user_specified_context = ""
     
-    # 2. 从查询中提取实体
-    entities = extract_entities_from_query(request.query, llm=Settings.llm)
-    print(f"从查询中提取到的实体: {entities}")
+    # 2. 从查询中提取实体 (添加错误处理和重试)
+    try:
+        entities = extract_entities_from_query(request.query, llm=Settings.llm)
+        print(f"从查询中提取到的实体: {entities}")
+    except Exception as e:
+        print(f"实体提取失败: {e}")
+        # 如果提取实体失败，使用空实体字典继续
+        entities = {}
     
     # 处理引用对象，将标签和地点直接添加到实体中，笔记添加到上下文
     if request.references:
@@ -506,9 +558,35 @@ async def handle_chat_request(request: ChatRequest):
         # 添加异常处理，确保任何查询错误都能被正确处理
         print(f"\n【执行查询】开始执行查询...")
         start_time = time.time()
-        response = query_engine.query(clean_query)
-        query_time = time.time() - start_time
-        print(f"【执行查询】查询完成，耗时: {query_time:.2f}秒")
+        
+        # 添加重试逻辑
+        retry_count = 0
+        max_retries = 3
+        
+        while retry_count <= max_retries:
+            try:
+                response = query_engine.query(clean_query)
+                query_time = time.time() - start_time
+                print(f"【执行查询】查询完成，耗时: {query_time:.2f}秒")
+                break  # 成功获取响应，退出循环
+            except Exception as e:
+                error_msg = str(e).lower()
+                retry_count += 1
+                
+                # 检查是否是Google API过载错误
+                if "model is overloaded" in error_msg and retry_count <= max_retries:
+                    wait_time = 2 ** retry_count  # 指数退避: 2, 4, 8秒
+                    print(f"【API过载】Google API暂时过载，等待{wait_time}秒后重试 ({retry_count}/{max_retries})...")
+                    time.sleep(wait_time)
+                    continue
+                    
+                # 如果是最后一次重试仍失败，或者是其他类型的错误，则抛出异常
+                if retry_count > max_retries or "model is overloaded" not in error_msg:
+                    raise
+        
+        # 如果所有重试都失败，就报错
+        if retry_count > max_retries:
+            raise Exception("尝试多次后仍无法获取响应，Google API可能持续过载")
         
         # 获取并打印实际发送给LLM的完整提示词
         try:
@@ -573,6 +651,58 @@ async def handle_chat_request(request: ChatRequest):
         # 捕获所有其他异常
         error_str = str(e)
         print(f"未预期的错误: {error_str}")
+        
+        # 处理Google API过载错误
+        if "model is overloaded" in error_str.lower():
+            print("Google API过载，尝试切换到备用Gemini模型...")
+            
+            # 尝试使用不同的Gemini模型
+            current_model = getattr(Settings.llm, "model", GEMINI_MODELS[0])
+            
+            # 找到当前模型在列表中的位置
+            try:
+                current_index = GEMINI_MODELS.index(current_model)
+            except ValueError:
+                current_index = -1  # 如果当前模型不在列表中
+            
+            # 尝试列表中的下一个模型
+            for i in range(current_index + 1, len(GEMINI_MODELS)):
+                fallback_model = GEMINI_MODELS[i]
+                try:
+                    print(f"尝试切换到备用模型: {fallback_model}")
+                    # 临时切换LLM模型
+                    original_llm = Settings.llm
+                    Settings.llm = GoogleGenAI(
+                        model=fallback_model,
+                        api_key=api_key,
+                        temperature=0.7
+                    )
+                    
+                    # 创建新的查询引擎
+                    fallback_query_engine = RetrieverQueryEngine.from_args(
+                        retriever=retriever,
+                        text_qa_template=qa_template,
+                        node_postprocessors=node_postprocessors,
+                        llm=Settings.llm,
+                        streaming=False
+                    )
+                    
+                    # 尝试使用备用模型进行查询
+                    print(f"使用{fallback_model}模型重试查询...")
+                    response = fallback_query_engine.query(clean_query)
+                    print(f"成功使用{fallback_model}模型回退")
+                    
+                    # 恢复原始LLM
+                    Settings.llm = original_llm
+                    
+                    return {"response": str(response.response), "note": f"使用了备用模型{fallback_model}进行回答"}
+                except Exception as fallback_error:
+                    print(f"{fallback_model}模型回退也失败: {str(fallback_error)}")
+                    # 恢复原始LLM
+                    Settings.llm = original_llm
+                    continue
+            
+            return {"response": "抱歉，AI服务器目前负载较高，请稍后再试。", "error": error_str}
         
         # 处理Cohere API特定错误
         if "model " in error_str and "not found" in error_str or "cohere" in error_str.lower():
