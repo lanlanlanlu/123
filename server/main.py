@@ -446,12 +446,27 @@ async def handle_chat_request(request: ChatRequest):
         if memory:
             print(f"成功加载对话 {request.chat_id} 的记忆")
     
+    # ======= 查询重写阶段 =======
+    # 如果有chat_id和记忆管理器，执行查询重写以解决代词指代问题
+    original_query = request.query
+    rewritten_query = original_query
+    
+    if memory_manager and request.chat_id:
+        try:
+            # 使用查询重写方法获取明确的查询
+            rewritten_query = memory_manager.rewrite_query(request.chat_id, original_query)
+            if rewritten_query != original_query:
+                print(f"【查询重写】原始查询: '{original_query}' -> 重写后: '{rewritten_query}'")
+        except Exception as e:
+            print(f"【查询重写】失败: {e}，将使用原始查询继续")
+    
     # 处理引用内容
     user_specified_context = ""
     
     # 2. 从查询中提取实体 (添加错误处理和重试)
     try:
-        entities = extract_entities_from_query(request.query, llm=Settings.llm)
+        # 使用重写后的查询进行实体提取
+        entities = extract_entities_from_query(rewritten_query, llm=Settings.llm)
         print(f"从查询中提取到的实体: {entities}")
     except Exception as e:
         print(f"实体提取失败: {e}")
@@ -641,10 +656,10 @@ async def handle_chat_request(request: ChatRequest):
     )
 
     # 4. 使用查询引擎进行查询
-    # 为了让AI更好地理解，我们可以把标签和地点从问题中移除
-    clean_query = re.sub(r'[@#]([\w\u4e00-\u9fa5]+)', '', request.query).strip()
-    if not clean_query:  # 如果清理后问题为空，就用原始问题
-        clean_query = request.query
+    # 使用重写后的查询进行搜索，但仍保留原始查询文本供LLM了解用户真实问题
+    clean_query = re.sub(r'[@#]([\w\u4e00-\u9fa5]+)', '', rewritten_query).strip()
+    if not clean_query:  # 如果清理后问题为空，就用重写后的原始问题
+        clean_query = rewritten_query
 
     print(f"发送给AI的清理后查询: {clean_query}")
     
@@ -751,7 +766,7 @@ async def handle_chat_request(request: ChatRequest):
             # 创建更丰富的用户消息和AI回复
             user_message = {
                 "role": "user", 
-                "content": request.query,
+                "content": original_query,  # 保存原始查询而不是重写的查询
                 "metadata": {"mentioned_people": known_people} if known_people else {}
             }
             
@@ -761,7 +776,7 @@ async def handle_chat_request(request: ChatRequest):
             }
             
             # 打印详细的记忆信息以进行调试
-            print(f"【记忆管理】即将保存的消息: \n - 用户: {request.query}\n - AI: {response.response[:50]}...")
+            print(f"【记忆管理】即将保存的消息: \n - 用户: {original_query}\n - AI: {response.response[:50]}...")
             
             # 保存到记忆
             if memory_manager:
@@ -802,7 +817,7 @@ async def handle_chat_request(request: ChatRequest):
                     # 验证保存结果
                     memory_content = memory_manager.get_memory_content(request.chat_id)
                     msg_count = len(memory_content.get("messages", []))
-                    facts_count = len(memory_content.get("facts", []))
+                    facts_count = len(memory_content.get("facts", [])) if "facts" in memory_content else 0
                     print(f"【记忆管理】保存后的记忆包含 {msg_count} 条消息, {facts_count} 条事实")
                     print(f"【记忆管理】存储路径: {memory_manager.storage_dir}/{request.chat_id}.json")
                     
@@ -824,7 +839,15 @@ async def handle_chat_request(request: ChatRequest):
         else:
             print("【记忆管理】警告: 请求中没有提供chat_id，跳过记忆保存")
         
-        return {"response": full_response_text}
+        # 返回回复，并包含查询重写信息（如果发生了重写）
+        response_data = {"response": full_response_text}
+        if original_query != rewritten_query:
+            response_data["query_info"] = {
+                "original": original_query,
+                "rewritten": rewritten_query
+            }
+        
+        return response_data
         
     except ValueError as e:
         # 捕获值错误，如文档数量不足的错误

@@ -1,10 +1,16 @@
 import os
 import json
 import logging
+import time
 from typing import List, Dict, Optional, Any, Union
 from pathlib import Path
 
-from llama_index.core.memory import Memory
+# 导入更多记忆类型
+from llama_index.core.memory import (
+    Memory, 
+    ChatMemoryBuffer,
+    ChatSummaryMemoryBuffer
+)
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core import Settings
 
@@ -13,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ChatMemoryManager:
-    """管理每个对话的记忆功能"""
+    """管理每个对话的记忆功能，使用LlamaIndex的内置记忆管理"""
     
     def __init__(self, storage_dir: str = "./storage/memories"):
         """初始化聊天记忆管理器
@@ -35,30 +41,37 @@ class ChatMemoryManager:
         Returns:
             Memory: 记忆实例
         """
-        # 使用新版API创建记忆实例
         try:
-            # 尝试使用新版API
-            memory = Memory.from_defaults(
-                session_id=chat_id,
+            # 使用ChatSummaryMemoryBuffer - 会自动摘要长对话
+            memory = ChatSummaryMemoryBuffer.from_defaults(
                 token_limit=token_limit,
-                chat_history_token_ratio=0.7,
-                token_flush_size=1000,
-                insert_method="system"  # 将记忆插入系统消息
+                llm=Settings.llm  # 使用全局设置的LLM创建摘要
+                # 移除不支持的memory_key参数
             )
-            logger.info(f"使用新版API创建记忆实例成功，chat_id: {chat_id}")
+            logger.info(f"使用ChatSummaryMemoryBuffer创建记忆实例成功，chat_id: {chat_id}")
             return memory
         except Exception as e:
-            logger.error(f"使用新版API创建记忆实例失败: {e}")
-            logger.info("尝试使用兼容模式创建记忆实例...")
+            logger.error(f"使用ChatSummaryMemoryBuffer创建记忆实例失败: {e}")
+            logger.info("尝试使用基础记忆模式创建实例...")
             
-            # 兼容模式：创建基本的Memory对象
-            memory = Memory.from_defaults(
-                session_id=chat_id,
-                token_limit=token_limit,
-                insert_method="system"
-            )
-            logger.info(f"使用兼容模式创建记忆实例成功，chat_id: {chat_id}")
-            return memory
+            # 退回到基本的ChatMemoryBuffer
+            try:
+                memory = ChatMemoryBuffer.from_defaults(
+                    token_limit=token_limit
+                    # 移除不支持的memory_key参数
+                )
+                logger.info(f"使用ChatMemoryBuffer创建记忆实例成功，chat_id: {chat_id}")
+                return memory
+            except Exception as e2:
+                logger.error(f"使用ChatMemoryBuffer创建记忆实例失败: {e2}")
+                
+                # 最后的回退方案：使用标准Memory
+                memory = Memory.from_defaults(
+                    session_id=chat_id,  # 这里保留session_id参数，因为标准Memory支持
+                    token_limit=token_limit
+                )
+                logger.info(f"使用标准Memory创建记忆实例成功，chat_id: {chat_id}")
+                return memory
     
     def save_memory(self, chat_id: str, messages: List[Dict[str, Any]]) -> bool:
         """保存对话记忆
@@ -86,71 +99,32 @@ class ChatMemoryManager:
             
             # 将消息转换为ChatMessage对象
             chat_messages = []
-            # 提取所有提到的人名
-            mentioned_people = set()
-            
             for msg in messages:
                 role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
-                # 提取metadata中的人名
-                if msg.get("metadata") and msg.get("metadata").get("mentioned_people"):
-                    for person in msg.get("metadata").get("mentioned_people"):
-                        mentioned_people.add(person)
-                
-                # 处理内容，提取可能的人名引用
                 content = msg.get("content", "")
-                
-                chat_messages.append(ChatMessage(
-                    role=role,
-                    content=content
-                ))
+                chat_messages.append(ChatMessage(role=role, content=content))
             
-            # 创建记忆实例 - 注意：不再使用内部属性
+            # 创建记忆实例
             memory = self.create_memory_instance(chat_id)
             
             # 将消息添加到记忆中
             for msg in chat_messages:
                 memory.put(msg)
             
-            # 提取人名相关事实 - 直接创建事实列表，不依赖内部实现
-            people_facts = []
-            if mentioned_people:
-                for person in mentioned_people:
-                    people_facts.append(f"对话中提到了人物: {person}")
-            
-            # 保存记忆状态
+            # 保存记忆状态到文件
             memory_file = os.path.join(self.storage_dir, f"{chat_id}.json")
             
-            # 不再尝试访问内部_memory_blocks属性
-            # 直接使用提取的事实
-            all_facts = people_facts
+            # 获取记忆中的消息
+            memory_messages = memory.get_all()
             
-            # 检查文件路径是否有效
-            logger.info(f"准备保存记忆到文件: {memory_file}")
-            
-            # 检查目录权限
-            try:
-                # 确保目录存在且可写
-                os.makedirs(os.path.dirname(memory_file), exist_ok=True)
-                
-                # 尝试创建一个临时文件测试写入权限
-                test_file = os.path.join(os.path.dirname(memory_file), ".test_write")
-                with open(test_file, "w") as f:
-                    f.write("test")
-                os.remove(test_file)
-                logger.info(f"目录权限检查通过: {os.path.dirname(memory_file)}")
-            except Exception as e:
-                logger.error(f"目录权限检查失败: {e}")
-                
             # 准备要保存的数据
             memory_data = {
                 "chat_id": chat_id,
                 "messages": [{
-                    "role": msg.get("role"),
-                    "content": msg.get("content"),
-                    "metadata": msg.get("metadata", {})
-                } for msg in messages],  # 保存原始消息，包括metadata
-                "facts": all_facts,
-                "mentioned_people": list(mentioned_people)  # 添加特别跟踪的人名列表
+                    "role": msg.role.value,  # 使用枚举的值
+                    "content": msg.content
+                } for msg in memory_messages],
+                "last_updated": int(time.time())  # 使用导入的time模块
             }
             
             # 将数据转换为JSON字符串
@@ -174,7 +148,7 @@ class ChatMemoryManager:
             else:
                 logger.error(f"文件创建失败: {memory_file}")
                 
-            logger.info(f"成功保存对话 {chat_id} 的记忆，包含 {len(messages)} 条消息, {len(all_facts)} 条事实")
+            logger.info(f"成功保存对话 {chat_id} 的记忆，包含 {len(memory_messages)} 条消息")
             return True
         except Exception as e:
             logger.error(f"保存记忆失败: {e}")
@@ -215,32 +189,20 @@ class ChatMemoryManager:
             # 创建记忆实例
             memory = self.create_memory_instance(chat_id)
             
-            # 添加静态事实块 - 直接从文件中读取事实，而不是依赖内部结构
-            facts_content = ""
-            if "facts" in memory_data and memory_data["facts"]:
-                facts_content += "\n".join([f"- {fact}" for fact in memory_data["facts"]])
-                logger.info(f"加载了 {len(memory_data['facts'])} 条事实")
-            
-            # 特别处理人名记忆
-            if "mentioned_people" in memory_data and memory_data["mentioned_people"]:
-                if facts_content:
-                    facts_content += "\n\n"
-                facts_content += "重要人物:\n" + "\n".join([f"- {person}" for person in memory_data["mentioned_people"]])
-                logger.info(f"加载了 {len(memory_data['mentioned_people'])} 个人物")
-            
-            # 如果有事实内容，使用系统消息添加到记忆中
-            if facts_content:
-                system_message = ChatMessage(
-                    role=MessageRole.SYSTEM,
-                    content=f"从之前的对话中提取的事实和信息:\n{facts_content}"
-                )
-                memory.put(system_message)
-                logger.info(f"为对话 {chat_id} 添加了系统消息，包含事实和人物信息")
-            
             # 加载消息
             messages = []
             for msg in memory_data.get("messages", []):
-                role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
+                # 转换角色字符串为MessageRole
+                role_str = msg.get("role", "")
+                if role_str.lower() == "user":
+                    role = MessageRole.USER
+                elif role_str.lower() == "assistant":
+                    role = MessageRole.ASSISTANT
+                elif role_str.lower() == "system":
+                    role = MessageRole.SYSTEM
+                else:
+                    role = MessageRole.USER  # 默认为用户
+                
                 messages.append(ChatMessage(
                     role=role,
                     content=msg.get("content", "")
@@ -251,6 +213,10 @@ class ChatMemoryManager:
             for msg in messages:
                 memory.put(msg)
                 msg_count += 1
+            
+            # 添加一个系统消息，明确总结之前的对话内容，使LLM能够正确理解上下文
+            if msg_count > 0:
+                self._add_context_summary(memory, messages)
                 
             logger.info(f"成功加载对话 {chat_id} 的记忆，共 {msg_count} 条消息")
             return memory
@@ -260,6 +226,54 @@ class ChatMemoryManager:
             logger.error(f"详细错误: {traceback.format_exc()}")
             return None
     
+    def _add_context_summary(self, memory: Memory, messages: List[ChatMessage]) -> None:
+        """添加上下文总结作为系统消息
+        
+        这个函数为Memory添加一个系统消息，明确总结之前的对话内容，
+        使LLM能够更好地理解代词指代和上下文
+        
+        Args:
+            memory: 记忆实例
+            messages: 历史消息列表
+        """
+        try:
+            # 只处理有实际对话的情况
+            if len(messages) < 2:
+                logger.info("消息太少，不需要添加上下文总结")
+                return
+            
+            # 构建对话摘要
+            context_pairs = []
+            for i in range(0, len(messages) - 1, 2):
+                if i + 1 < len(messages):
+                    user_msg = messages[i].content if messages[i].role == MessageRole.USER else "?"
+                    assistant_msg = messages[i+1].content if i+1 < len(messages) and messages[i+1].role == MessageRole.ASSISTANT else "?"
+                    # 截断过长的消息内容
+                    user_msg = user_msg[:100] + "..." if len(user_msg) > 100 else user_msg
+                    assistant_msg = assistant_msg[:150] + "..." if len(assistant_msg) > 150 else assistant_msg
+                    context_pairs.append(f"用户问：\"{user_msg}\"，您回答：\"{assistant_msg}\"")
+            
+            # 提取最近一次用户的问题中可能提及的实体和主题
+            last_user_msg = next((msg.content for msg in reversed(messages) if msg.role == MessageRole.USER), "")
+            
+            # 构建系统消息
+            system_message = f"""以下是之前的对话内容摘要，请在回答新问题时考虑这些上下文:
+{chr(10).join(context_pairs)}
+
+重要提示：用户在之前的对话中可能提到了特定的实体、人物或概念。
+如果用户使用代词（如"它"、"他"、"这个"等），很可能是指代之前提到过的实体。
+特别注意处理代词指代问题，确保理解用户真正询问的对象。
+
+当前对话主题: {last_user_msg}
+"""
+            
+            # 添加系统消息到记忆
+            memory.put(ChatMessage(role=MessageRole.SYSTEM, content=system_message))
+            logger.info("成功添加上下文总结到记忆")
+            
+        except Exception as e:
+            logger.error(f"添加上下文总结失败: {e}")
+    
     def get_memory_content(self, chat_id: str) -> Dict[str, Any]:
         """获取对话记忆内容
         
@@ -267,13 +281,13 @@ class ChatMemoryManager:
             chat_id: 对话ID
             
         Returns:
-            Dict[str, Any]: 记忆内容，包括消息和提取的事实
+            Dict[str, Any]: 记忆内容，包括消息
         """
         memory_file = os.path.join(self.storage_dir, f"{chat_id}.json")
         
         if not os.path.exists(memory_file):
             logger.info(f"对话 {chat_id} 的记忆不存在")
-            return {"chat_id": chat_id, "messages": [], "facts": []}
+            return {"chat_id": chat_id, "messages": []}
             
         try:
             # 加载记忆数据
@@ -283,7 +297,119 @@ class ChatMemoryManager:
             return memory_data
         except Exception as e:
             logger.error(f"获取记忆内容失败: {e}")
-            return {"chat_id": chat_id, "messages": [], "facts": []}
+            return {"chat_id": chat_id, "messages": []}
+    
+    def get_conversation_summary(self, chat_id: str) -> str:
+        """获取对话的摘要
+        
+        Args:
+            chat_id: 对话ID
+            
+        Returns:
+            str: 对话摘要
+        """
+        memory_content = self.get_memory_content(chat_id)
+        messages = memory_content.get("messages", [])
+        
+        if not messages:
+            return "没有找到相关对话记录。"
+        
+        # 构建摘要
+        summary_parts = []
+        for i, msg in enumerate(messages):
+            role = msg.get("role", "").lower()
+            content = msg.get("content", "")
+            
+            if role == "user":
+                prefix = "用户问："
+            elif role == "assistant":
+                prefix = "AI回答："
+            else:
+                prefix = "系统："
+                
+            # 截断过长的内容
+            if len(content) > 100:
+                content = content[:100] + "..."
+                
+            summary_parts.append(f"{prefix} {content}")
+            
+        return "\n".join(summary_parts)
+    
+    def rewrite_query(self, chat_id: str, query: str) -> str:
+        """基于历史对话重写用户查询，以解决代词指代问题
+        
+        这是实现"查询重写式RAG"(Query-Rewriting RAG)的核心方法。
+        它在检索前使用对话记忆和LLM将模糊的查询(如使用代词"它"的问题)
+        重写为明确的、独立的问题，从而大大提高检索准确性。
+        
+        Args:
+            chat_id: 对话ID
+            query: 原始用户查询，可能含有代词指代
+            
+        Returns:
+            str: 重写后的明确查询
+        """
+        # 如果查询本身已经很明确，不需要重写
+        if len(query.strip()) > 30 and not any(word in query.lower() for word in ['它', '他', '她', '这个', '那个']):
+            logger.info(f"查询已经足够明确，无需重写: {query}")
+            return query
+            
+        try:
+            # 获取对话记忆
+            memory_content = self.get_memory_content(chat_id)
+            messages = memory_content.get("messages", [])
+            
+            # 如果没有历史记录，无法重写查询
+            if not messages or len(messages) < 2:
+                logger.info("没有足够的对话历史来重写查询")
+                return query
+                
+            # 构建对话历史上下文，选取最近的4轮对话(最多8条消息)
+            recent_messages = messages[-8:]
+            history_text = []
+            
+            for msg in recent_messages:
+                role = "用户" if msg.get("role") == "user" else "助手"
+                content = msg.get("content", "")
+                history_text.append(f"{role}: {content}")
+                
+            history = "\n".join(history_text)
+            
+            # 构建查询重写提示词
+            rewrite_prompt = f"""请根据以下对话历史，将用户最新的可能含有代词(如"它"、"他"、"这个"等)的问题重写为一个完整、明确、独立的问题。
+这个重写后的问题应该是一个陌生人也能立即理解的清晰查询。
+
+对话历史:
+{history}
+
+用户最新问题: {query}
+
+重写后的完整明确问题(只输出重写后的问题,不要任何解释):"""
+            
+            # 调用LLM进行查询重写
+            logger.info(f"开始重写查询: {query}")
+            llm = Settings.llm
+            
+            if not llm:
+                logger.error("无法获取LLM实例进行查询重写")
+                return query
+                
+            response = llm.complete(rewrite_prompt)
+            rewritten_query = response.text.strip()
+            
+            # 确保重写的查询有意义
+            if len(rewritten_query) < 5 or rewritten_query == query:
+                logger.info(f"重写结果无效或与原查询相同: {rewritten_query}")
+                return query
+                
+            logger.info(f"查询重写成功。原始查询: '{query}' -> 重写后: '{rewritten_query}'")
+            return rewritten_query
+            
+        except Exception as e:
+            logger.error(f"查询重写失败: {e}")
+            import traceback
+            logger.error(f"详细错误: {traceback.format_exc()}")
+            return query  # 出错时返回原始查询
             
     def delete_memory(self, chat_id: str) -> bool:
         """删除对话记忆
