@@ -93,7 +93,7 @@ class SettingsHeatMapBloc extends Bloc<SettingsHeatMapEvent, SettingsHeatMapStat
     } catch (e) {
       emit(state.copyWith(
         isLoading: false,
-        error: '加载热力图数据失败: ${e.toString()}',
+        error: 'Failed to load heatmap data: ${e.toString()}',
       ));
     }
   }

@@ -65,8 +65,7 @@ dependencies:
   dash_chat_2: ^0.0.21
   dio: ^5.8.0+1
   uuid: ^4.5.1
-  flutter_heatmap_calendar: ^1.0.5
-  contributions_chart: ^1.0.0+4
+  simple_heatmap_calendar: ^0.4.0
 
 dev_dependencies:
   flutter_test:
