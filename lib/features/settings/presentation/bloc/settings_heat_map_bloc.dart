@@ -1,47 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:equatable/equatable.dart';
 import 'package:record_app/data/repository/notes_repository.dart';
-
-// 事件定义
-abstract class SettingsHeatMapEvent extends Equatable {
-  const SettingsHeatMapEvent();
-
-  @override
-  List<Object?> get props => [];
-}
-
-// 加载热力图数据事件
-class LoadHeatMapData extends SettingsHeatMapEvent {
-  const LoadHeatMapData();
-}
-
-// 状态定义
-class SettingsHeatMapState extends Equatable {
-  final Map<DateTime, int> heatMapData;
-  final bool isLoading;
-  final String? error;
-
-  const SettingsHeatMapState({
-    this.heatMapData = const {},
-    this.isLoading = false,
-    this.error,
-  });
-
-  SettingsHeatMapState copyWith({
-    Map<DateTime, int>? heatMapData,
-    bool? isLoading,
-    String? error,
-  }) {
-    return SettingsHeatMapState(
-      heatMapData: heatMapData ?? this.heatMapData,
-      isLoading: isLoading ?? this.isLoading,
-      error: error != null ? error : this.error,
-    );
-  }
-
-  @override
-  List<Object?> get props => [heatMapData, isLoading, error];
-}
+import 'settings_heat_map_event.dart';
+import 'settings_heat_map_state.dart';
 
 // Bloc实现
 class SettingsHeatMapBloc extends Bloc<SettingsHeatMapEvent, SettingsHeatMapState> {

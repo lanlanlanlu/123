@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:simple_heatmap_calendar/simple_heatmap_calendar.dart';
 import '../bloc/settings_heat_map_bloc.dart';
+import '../bloc/settings_heat_map_state.dart';
 
 class HeatMapChartWidget extends StatefulWidget {
   const HeatMapChartWidget({super.key});

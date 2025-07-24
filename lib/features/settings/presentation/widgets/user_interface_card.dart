@@ -35,7 +35,7 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
                   ? '用户界面'
                   : 'User Interface',
               style: const TextStyle(
-                fontSize: 16,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -59,8 +59,6 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
             },
           ),
           
-          const Divider(height: 1, indent: 56),
-          
           // 语言设置选项
           _buildSettingItem(
             context,
@@ -71,8 +69,6 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
             trailing: _buildLanguageDropdown(context),
           ),
           
-          const Divider(height: 1, indent: 56),
-          
           // 主题模式选项
           _buildSettingItem(
             context,
@@ -82,8 +78,6 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
                 : 'Theme Mode',
             trailing: _buildThemeModeDropdown(context),
           ),
-          
-          const Divider(height: 1, indent: 56),
           
           // 首页卡片最大行数选项
           _buildSettingItem(
