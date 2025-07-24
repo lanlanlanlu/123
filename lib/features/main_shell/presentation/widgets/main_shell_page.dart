@@ -125,10 +125,9 @@ class _MainShellPageState extends State<MainShellPage> {
           ),
         );
       case 3:
-        return AppBar(
-          title: const Text('设置'),
-          centerTitle: true,
-        );
+        // 【核心修改】这里不再需要生成AppBar，因为SettingsPage自己管理自己的AppBar
+        // 返回一个空的、零高度的AppBar即可
+        return AppBar(toolbarHeight: 0, elevation: 0);
       default:
         return AppBar();
     }
@@ -388,11 +387,7 @@ class SettingsContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        '设置页面',
-        style: TextStyle(fontSize: 24),
-      ),
-    );
+    // 使用SettingsPage替代之前的文本显示
+    return const SettingsPage();
   }
 }

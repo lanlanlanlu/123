@@ -293,6 +293,39 @@ class NotesRepository {
       ));
   }
   
+  /// 获取笔记创作统计数据，返回每天的笔记创建数量
+  Future<Map<DateTime, int>> getNotesCreationStatistics() async {
+    // 获取过去一年的笔记
+    final DateTime now = DateTime.now();
+    final DateTime oneYearAgo = DateTime(now.year - 1, now.month, now.day);
+    
+    final notes = await (_database.select(_database.notes)
+      ..where((note) => 
+          note.createdAt.isBiggerOrEqualValue(oneYearAgo) & 
+          note.isDeleted.equals(false))
+    ).get();
+    
+    // 统计每天的笔记数量
+    final Map<DateTime, int> result = {};
+    
+    for (final note in notes) {
+      // 使用日期（年月日）作为键，忽略时间部分
+      final dateKey = DateTime(
+        note.createdAt.year,
+        note.createdAt.month,
+        note.createdAt.day,
+      );
+      
+      if (result.containsKey(dateKey)) {
+        result[dateKey] = result[dateKey]! + 1;
+      } else {
+        result[dateKey] = 1;
+      }
+    }
+    
+    return result;
+  }
+
   /// 获取笔记的缩略图模式
   Future<bool> getNoteThumbnailMode(int noteId) async {
     final note = await _database.noteDao.getNoteById(noteId);
