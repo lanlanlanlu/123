@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:record_app/main.dart';  // 导入LocaleCubit
+import 'custom_dropdown_menu.dart' as custom;  // 导入自定义下拉菜单，使用别名
 
 class UserInterfaceCard extends StatefulWidget {
   const UserInterfaceCard({super.key});
@@ -66,7 +67,20 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
             title: Localizations.localeOf(context).languageCode == 'zh'
                 ? '语言'
                 : 'Language',
-            trailing: _buildLanguageDropdown(context),
+            trailing: _buildCustomDropdown(
+              value: Localizations.localeOf(context).languageCode,
+              onChanged: (value) {
+                if (value != null) {
+                  final newLocale = Locale(value);
+                  context.read<LocaleCubit>().changeLocale(newLocale);
+                }
+              },
+              items: [
+                _buildDropdownItem('zh', Localizations.localeOf(context).languageCode == 'zh' ? '中文' : 'Chinese'),
+                _buildDropdownItem('en', Localizations.localeOf(context).languageCode == 'zh' ? '英文' : 'English'),
+              ],
+              width: 120.0,
+            ),
           ),
           
           // 主题模式选项
@@ -76,7 +90,31 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
             title: Localizations.localeOf(context).languageCode == 'zh'
                 ? '主题模式'
                 : 'Theme Mode',
-            trailing: _buildThemeModeDropdown(context),
+            trailing: _buildCustomDropdown(
+              value: _themeMode,
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _themeMode = value;
+                  });
+                }
+              },
+              items: [
+                _buildDropdownItem(
+                  'system', 
+                  Localizations.localeOf(context).languageCode == 'zh' ? '跟随系统' : 'Follow system'
+                ),
+                _buildDropdownItem(
+                  'light', 
+                  Localizations.localeOf(context).languageCode == 'zh' ? '浅色' : 'Light'
+                ),
+                _buildDropdownItem(
+                  'dark', 
+                  Localizations.localeOf(context).languageCode == 'zh' ? '深色' : 'Dark'
+                ),
+              ],
+              width: 150.0,
+            ),
           ),
           
           // 首页卡片最大行数选项
@@ -86,29 +124,80 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
             title: Localizations.localeOf(context).languageCode == 'zh'
                 ? '首页卡片最大行数'
                 : 'Max card lines',
-            trailing: DropdownButton<String>(
+            trailing: _buildCustomDropdown(
               value: _maxCardLines,
-              underline: const SizedBox(),
-              icon: const Icon(Icons.arrow_drop_down),
-              onChanged: (String? value) {
+              onChanged: (value) {
                 if (value != null) {
                   setState(() {
                     _maxCardLines = value;
                   });
                 }
               },
-              items: ['500', '1000', '2000'].map<DropdownMenuItem<String>>((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
+              items: [
+                _buildDropdownItem('500', '500'),
+                _buildDropdownItem('1000', '1000'),
+                _buildDropdownItem('2000', '2000'),
+              ],
+              width: 100.0,
             ),
           ),
           
           const SizedBox(height: 8.0), // 底部间距
         ],
       ),
+    );
+  }
+  
+  // 【核心修改】使用Builder来获取正确的context
+  Widget _buildCustomDropdown<T>({
+    required T value,
+    required ValueChanged<T?> onChanged,
+    required List<custom.DropdownMenuItem<T>> items,
+    double? width,
+  }) {
+    return Builder(
+      builder: (BuildContext context) {
+        return GestureDetector(
+          onTap: () async {
+            final result = await custom.CustomDropdownMenu.show<T>(
+              context: context,
+              currentValue: value,
+              items: items,
+              width: width,
+            );
+            
+            if (result != null) {
+              onChanged(result);
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  items.firstWhere((item) => item.value == value).title,
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_drop_down, size: 18),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+  
+  // 创建下拉项
+  custom.DropdownMenuItem<T> _buildDropdownItem<T>(T value, String title) {
+    return custom.DropdownMenuItem<T>(
+      value: value,
+      title: title,
     );
   }
   
@@ -164,67 +253,4 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
     );
   }
-  
-  // 构建主题模式下拉菜单
-  Widget _buildThemeModeDropdown(BuildContext context) {
-    final isZh = Localizations.localeOf(context).languageCode == 'zh';
-    
-    return DropdownButton<String>(
-      value: _themeMode,
-      underline: const SizedBox(),
-      icon: const Icon(Icons.arrow_drop_down),
-      onChanged: (String? value) {
-        if (value != null) {
-          setState(() {
-            _themeMode = value;
-          });
-        }
-      },
-      items: [
-        DropdownMenuItem(
-          value: 'system',
-          child: Text(isZh ? '跟随系统' : 'Follow system'),
-        ),
-        DropdownMenuItem(
-          value: 'light',
-          child: Text(isZh ? '浅色' : 'Light'),
-        ),
-        DropdownMenuItem(
-          value: 'dark',
-          child: Text(isZh ? '深色' : 'Dark'),
-        ),
-      ],
-    );
-  }
-  
-  // 构建语言下拉菜单
-  Widget _buildLanguageDropdown(BuildContext context) {
-    final currentLocale = Localizations.localeOf(context).languageCode;
-    
-    return DropdownButton<String>(
-      value: currentLocale,
-      underline: const SizedBox(),
-      icon: const Icon(Icons.arrow_drop_down),
-      onChanged: (String? newValue) {
-        if (newValue != null) {
-          final newLocale = Locale(newValue);
-          context.read<LocaleCubit>().changeLocale(newLocale);
-        }
-      },
-      items: [
-        DropdownMenuItem(
-          value: 'zh',
-          child: Text(
-            currentLocale == 'zh' ? '中文' : 'Chinese',
-          ),
-        ),
-        DropdownMenuItem(
-          value: 'en',
-          child: Text(
-            currentLocale == 'zh' ? '英文' : 'English',
-          ),
-        ),
-      ],
-    );
-  }
-} 
+}

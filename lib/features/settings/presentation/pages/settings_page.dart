@@ -9,6 +9,7 @@ import '../bloc/settings_stats_event.dart';
 import '../widgets/heat_map_chart_widget.dart';
 import '../widgets/stats_summary_card.dart';
 import '../widgets/user_interface_card.dart';
+import '../widgets/data_security_card.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -33,10 +34,10 @@ class SettingsPage extends StatelessWidget {
           children: [
             // 热力图区域 (移除了固定高度的SizedBox)
             BlocProvider(
-              create: (context) => SettingsHeatMapBloc(
-                notesRepository: context.read<NotesRepository>(),
-              )..add(const LoadHeatMapData()),
-              child: const HeatMapChartWidget(),
+        create: (context) => SettingsHeatMapBloc(
+          notesRepository: context.read<NotesRepository>(),
+        )..add(const LoadHeatMapData()),
+        child: const HeatMapChartWidget(),
             ),
             
             // 统计摘要卡片
@@ -50,6 +51,9 @@ class SettingsPage extends StatelessWidget {
             
             // 用户界面设置卡片 - 使用独立组件
             const UserInterfaceCard(),
+            
+            // 数据与安全设置卡片 - 新增
+            const DataSecurityCard(),
           ],
         ),
       ),

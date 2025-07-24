@@ -103,6 +103,7 @@ class _HeatMapChartWidgetState extends State<HeatMapChartWidget> {
               cellRadius: BorderRadius.all(Radius.circular(4.0)),
               weekLabelValueFontSize: 10.0,
               monthLabelFontSize: 12.0,
+              // colorTipAlignBy: CalendarColorTipAlignBy.right,
             ),
             
             layoutParameters: const HeatmapLayoutParameters.defaults(
