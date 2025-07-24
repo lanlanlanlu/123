@@ -73,12 +73,12 @@ class ChatMemoryManager:
                 logger.info(f"使用标准Memory创建记忆实例成功，chat_id: {chat_id}")
                 return memory
     
-    def save_memory(self, chat_id: str, messages: List[Dict[str, Any]]) -> bool:
+    def save_memory(self, chat_id: str, messages: List[Union[Dict[str, Any], ChatMessage]]) -> bool:
         """保存对话记忆
         
         Args:
             chat_id: 对话ID
-            messages: 消息列表
+            messages: 消息列表，可以是Dict或ChatMessage对象
             
         Returns:
             bool: 是否成功保存
@@ -97,12 +97,17 @@ class ChatMemoryManager:
                 logger.info(f"存储目录不存在，正在创建: {memory_dir}")
                 memory_dir.mkdir(parents=True, exist_ok=True)
             
-            # 将消息转换为ChatMessage对象
+            # 将消息转换为ChatMessage对象，处理不同的输入类型
             chat_messages = []
             for msg in messages:
-                role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
-                content = msg.get("content", "")
-                chat_messages.append(ChatMessage(role=role, content=content))
+                if isinstance(msg, ChatMessage):
+                    # 如果已经是ChatMessage对象，直接使用
+                    chat_messages.append(msg)
+                else:
+                    # 如果是字典格式，转换为ChatMessage对象
+                    role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
+                    content = msg.get("content", "")
+                    chat_messages.append(ChatMessage(role=role, content=content))
             
             # 创建记忆实例
             memory = self.create_memory_instance(chat_id)

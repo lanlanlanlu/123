@@ -6,10 +6,15 @@ import 'package:record_app/data/models/chat_request.dart';
 import 'package:record_app/data/database/connection/connection.dart' as connection;
 import 'package:record_app/data/database/database.dart';
 import 'package:record_app/data/repository/notes_repository.dart';
+import 'package:record_app/features/ai_chat/presentation/widgets/model_selector.dart';
+import 'package:flutter/foundation.dart';
 
 class AiChatRepository {
   late final Dio _dio;
   late final AppDatabase _database;
+  
+  /// 当前使用的模型
+  AiModel _currentModel = AiModel.gemini25Flash;
 
   AiChatRepository() {
     _dio = Dio(BaseOptions(
@@ -34,6 +39,48 @@ class AiChatRepository {
     // 注意: 如果你使用物理手机进行调试，需要将这里的地址换成你电脑的局域网IP
     // 例如: 'http://192.168.150.1:8000'
   }
+  
+  /// 设置当前使用的模型
+  void setModel(AiModel model) {
+    if (_currentModel != model) {
+      debugPrint('AiChatRepository: 模型切换为 ${model.technicalName}');
+      _currentModel = model;
+      
+      // 立即通知服务器模型已变更
+      sendModelChangeNotification(model.technicalName);
+    }
+  }
+  
+  /// 通知服务器模型变更
+  void sendModelChangeNotification(String modelName) {
+    try {
+      // 发送一个简单的测试查询，主要目的是通知服务器切换模型
+      debugPrint('AiChatRepository: 正在发送模型变更通知...');
+      
+      // 创建一个最小化的请求，避免大量计算
+      final chatRequest = ChatRequest(
+        query: '模型切换测试 - 请忽略',
+        model: modelName,
+      );
+      
+      // 异步发送请求，不等待响应
+      _dio.post(
+        '$_apiBaseUrl/api/chat',
+        data: chatRequest.toJson(),
+      ).then((response) {
+        if (response.statusCode == 200 && response.data != null) {
+          debugPrint('AiChatRepository: 模型变更通知发送成功');
+        }
+      }).catchError((error) {
+        debugPrint('AiChatRepository: 模型变更通知发送失败: $error');
+      });
+    } catch (e) {
+      debugPrint('AiChatRepository: 发送模型变更通知时出错: $e');
+    }
+  }
+  
+  /// 获取当前使用的模型
+  AiModel get currentModel => _currentModel;
 
   // 发送问题并获取AI的回答
   Future<String> getAiResponse(
@@ -46,6 +93,7 @@ class AiChatRepository {
       print('AiChatRepository: 查询: $query');
       print('AiChatRepository: 聊天ID: ${chatId ?? "未提供"}');
       print('AiChatRepository: 引用数量: ${references?.length ?? 0}');
+      print('AiChatRepository: 使用模型: ${_currentModel.technicalName}');
       
       // 处理引用，填充内容
       List<ChatReference> enrichedReferences = [];
@@ -60,6 +108,7 @@ class AiChatRepository {
         query: query,
         references: enrichedReferences,
         chatId: chatId ?? '', // 添加聊天ID，如果没有则使用空字符串
+        model: _currentModel.technicalName, // 添加当前使用的模型名称
       );
       
       // 打印完整请求对象（转为JSON）用于调试
@@ -77,6 +126,10 @@ class AiChatRepository {
         // 解析后端返回的 JSON 数据
         print('AiChatRepository: 响应数据: ${response.data}');
         final result = response.data['response'] ?? '抱歉，未能解析返回结果。';
+        // 如果返回了使用的模型信息，输出日志
+        if (response.data['model'] != null) {
+          print('AiChatRepository: 服务器使用的模型: ${response.data['model']}');
+        }
         print('AiChatRepository: 解析后的响应: ${result.substring(0, result.length > 50 ? 50 : result.length)}...');
         return result;
       } else {

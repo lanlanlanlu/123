@@ -26,6 +26,9 @@ class ChatRequest with _$ChatRequest {
     
     /// 聊天ID - 用于记忆功能
     @Default('') String chatId,
+    
+    /// 模型名称 - 指定要使用的模型
+    @Default('gemini-2.5-flash') String model,
   }) = _ChatRequest;
   
   /// 从JSON创建

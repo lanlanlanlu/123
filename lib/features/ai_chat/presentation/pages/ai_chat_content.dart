@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import 'package:record_app/features/ai_chat/presentation/bloc/ai_chat_bloc.dart';
 import 'package:record_app/features/ai_chat/presentation/bloc/ai_chat_event.dart';
 import 'package:record_app/data/repository/ai_chat_repository.dart';
+import 'package:record_app/features/ai_chat/presentation/widgets/ai_chat_app_bar.dart';
 import 'package:record_app/features/ai_chat/presentation/pages/ai_chat_page.dart';
 import 'package:record_app/data/repository/chat_history_repository.dart';
 import 'package:record_app/data/database/database.dart';
@@ -257,78 +259,27 @@ class _AiChatContentState extends State<AiChatContent> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiRepositoryProvider(
-      providers: [
-        // 在这里提供 AiChatRepository
-        RepositoryProvider<AiChatRepository>(
-          create: (context) => AiChatRepository(),
-        ),
-        // 确保 ChatHistoryRepository 可用
-        RepositoryProvider<ChatHistoryRepository>(
-          create: (context) => ChatHistoryRepository(context.read<AppDatabase>()),
-        ),
-      ],
-      child: Builder(
-        builder: (context) {
-          // 如果_aiChatBloc已经存在，继续使用它，避免重新创建
-          if (_aiChatBloc == null) {
-            debugPrint('AiChatContent: build() - 创建新的AiChatBloc');
-            
-            // 创建新的AiChatBloc
-            final newBloc = AiChatBloc(
-              aiChatRepository: context.read<AiChatRepository>(),
-              onMessageAdded: _onMessageAdded,
-              onChatCleared: _onChatCleared, // 添加清除回调
-              chatHistoryId: _chatHistoryId?.toString(), // 传入聊天历史ID，转为字符串
-            );
-            
-            // 保存引用
-            _aiChatBloc = newBloc;
-            
-            // 根据_chatHistoryId状态决定如何初始化
-            if (_chatHistoryId != null) {
-              // 如果有聊天历史ID，从数据库加载历史消息
-              debugPrint('AiChatContent: build() - 加载历史消息，ID: $_chatHistoryId');
-              
-              // 在构建完成后异步加载历史消息
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
-                try {
-                  // 获取历史记录
-                  final chatHistory = await _chatHistoryRepository.getChatHistoryWithMessages(_chatHistoryId!);
-                  // 转换为dash_chat格式的消息
-                  final messages = _chatHistoryRepository.convertToMessages(chatHistory.messages);
-                  
-                  // 用历史消息初始化
-                  if (messages.isNotEmpty && _aiChatBloc != null) {
-                    debugPrint('AiChatContent: 加载了 ${messages.length} 条历史消息');
-                    _aiChatBloc!.add(AiChatInitializedWithHistory(messages));
-                  } else {
-                    // 如果没有历史消息，空初始化
-                    _aiChatBloc!.add(const AiChatInitialized());
-                  }
-                } catch (e) {
-                  debugPrint('AiChatContent: 加载历史消息失败: $e');
-                  // 出错时，空初始化
-                  _aiChatBloc!.add(const AiChatInitialized());
-                }
-              });
-            } else {
-              // 没有历史ID，空初始化
-              debugPrint('AiChatContent: build() - 空初始化');
-              newBloc.add(const AiChatInitialized());
-            }
-          } else {
-            debugPrint('AiChatContent: build() - 复用现有AiChatBloc');
-          }
-          
-          return BlocProvider(
-            create: (_) => _aiChatBloc!,
-            child: Material(
-              type: MaterialType.transparency,
-              child: const AiChatPage(),
-            ),
+    return RepositoryProvider<AiChatRepository>(
+      create: (context) => AiChatRepository(),
+      child: BlocProvider<AiChatBloc>(
+        create: (context) {
+          final bloc = AiChatBloc(
+            aiChatRepository: context.read<AiChatRepository>(),
+            onMessageAdded: _onMessageAdded,
+            onChatCleared: _onChatCleared,
+            chatHistoryId: _chatHistoryId?.toString(),
           );
-        }
+          _aiChatBloc = bloc; // 存储引用
+          return bloc;
+        },
+        child: Builder(
+          builder: (context) {
+            return Scaffold(
+              // 移除AppBar，避免重复
+              body: const AiChatPage(),
+            );
+          },
+        ),
       ),
     );
   }

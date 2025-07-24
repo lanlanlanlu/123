@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import 'package:record_app/data/database/connection/connection.dart';
 import 'package:record_app/data/database/database.dart';
 import 'package:record_app/data/repository/index.dart';
 import 'package:record_app/app/routes/app_router.dart';
+import 'package:record_app/features/ai_chat/presentation/providers/model_provider.dart';
 import 'package:record_app/features/home/presentation/bloc/home_bloc.dart';
 import 'package:record_app/features/home/presentation/bloc/home_event.dart';
+import 'package:record_app/features/home/presentation/bloc/search_bloc.dart';
 import 'package:record_app/features/tags/presentation/bloc/tag_list_bloc.dart';
 import 'package:record_app/features/main_shell/presentation/bloc/main_shell_cubit.dart';
 import 'package:record_app/data/database/connection/native.dart' show closeDatabase;
+import 'package:record_app/core/utils/search_service.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -189,6 +193,11 @@ class _AppState extends State<App> with WidgetsBindingObserver {
           ),
           lazy: false,
         ),
+        // 搜索服务
+        RepositoryProvider<SearchService>(
+          create: (context) => SearchService(),
+          lazy: false,
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -214,6 +223,13 @@ class _AppState extends State<App> with WidgetsBindingObserver {
           BlocProvider<MainShellCubit>(
             create: (context) => MainShellCubit(),
           ),
+          // 搜索Bloc
+          BlocProvider<SearchBloc>(
+            create: (context) => SearchBloc(
+              searchService: context.read<SearchService>(),
+            ),
+            lazy: true, // 延迟初始化，仅在需要时创建
+          ),
         ],
         child: const MyApp(),
       ),
@@ -229,45 +245,53 @@ class MyApp extends StatelessWidget {
     // 使用BlocBuilder监听语言变化
     return BlocBuilder<LocaleCubit, Locale?>(
       builder: (context, locale) {
-        return MaterialApp.router(
-          title: 'Record',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-            useMaterial3: true,
-            scaffoldBackgroundColor: const Color(0xFFF7F7F7), // 添加浅灰色背景
-            appBarTheme: const AppBarTheme(
-              elevation: 0,
-              backgroundColor: Color(0xFFF7F7F7),
-              foregroundColor: Colors.black,
-              titleTextStyle: TextStyle(
-                color: Colors.black,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
+        return MultiProvider(
+          providers: [
+            // 添加AI模型选择Provider
+            ChangeNotifierProvider<ModelProvider>(
+              create: (context) => ModelProvider(),
+            ),
+          ],
+          child: MaterialApp.router(
+            title: 'Record',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+              useMaterial3: true,
+              scaffoldBackgroundColor: const Color(0xFFF7F7F7), // 添加浅灰色背景
+              appBarTheme: const AppBarTheme(
+                elevation: 0,
+                backgroundColor: Color(0xFFF7F7F7),
+                foregroundColor: Colors.black,
+                titleTextStyle: TextStyle(
+                  color: Colors.black,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              cardTheme: CardTheme(
+                elevation: 0.5,
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
               ),
             ),
-            cardTheme: CardTheme(
-              elevation: 0.5,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-            ),
+            // 添加国际化支持
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            // 支持的语言列表
+            supportedLocales: const [
+              Locale('en', 'US'), // 英语
+              Locale('zh', 'CN'), // 中文
+            ],
+            // 使用用户选择的语言或默认语言
+            locale: locale,
+            routerConfig: router,
           ),
-          // 添加国际化支持
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          // 支持的语言列表
-          supportedLocales: const [
-            Locale('en', 'US'), // 英语
-            Locale('zh', 'CN'), // 中文
-          ],
-          // 使用用户选择的语言或默认语言
-          locale: locale,
-          routerConfig: router,
         );
       },
     );

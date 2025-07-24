@@ -19,12 +19,23 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          Localizations.localeOf(context).languageCode == 'zh' 
-              ? '设置' 
-              : 'Settings'
+        automaticallyImplyLeading: false,
+        titleSpacing: 16.0,
+        title: Row(
+          children: [
+            Text(
+              Localizations.localeOf(context).languageCode == 'zh' 
+                  ? '设置' 
+                  : 'Settings',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w400,
+                color: Colors.black,
+              ),
+            ),
+            const Spacer(),
+          ],
         ),
-        centerTitle: true,
         elevation: 0,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       ),

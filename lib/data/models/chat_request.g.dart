@@ -17,6 +17,7 @@ _$ChatRequestImpl _$$ChatRequestImplFromJson(Map<String, dynamic> json) =>
       rerankLanguage: json['rerankLanguage'] as String? ?? 'auto',
       useGraph: json['useGraph'] as bool?,
       chatId: json['chatId'] as String? ?? '',
+      model: json['model'] as String? ?? 'gemini-2.5-flash',
     );
 
 Map<String, dynamic> _$$ChatRequestImplToJson(_$ChatRequestImpl instance) =>
@@ -27,4 +28,5 @@ Map<String, dynamic> _$$ChatRequestImplToJson(_$ChatRequestImpl instance) =>
       'rerankLanguage': instance.rerankLanguage,
       'useGraph': instance.useGraph,
       'chatId': instance.chatId,
+      'model': instance.model,
     };

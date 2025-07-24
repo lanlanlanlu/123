@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:provider/provider.dart'; // 导入Provider包
+import 'package:provider/provider.dart';
 import '../bloc/ai_chat_bloc.dart';
 import '../bloc/ai_chat_event.dart';
-import '../../presentation/pages/chat_history_list_page.dart'; // 导入聊天历史列表页面
-import 'package:record_app/data/repository/ai_chat_repository.dart'; // 导入AiChatRepository
+import '../providers/model_provider.dart';
+import '../widgets/model_selector.dart';
+import '../../presentation/pages/chat_history_list_page.dart';
+import 'package:record_app/data/repository/ai_chat_repository.dart';
 
 /// AI聊天页面的AppBar
 class AiChatAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -20,7 +22,7 @@ class AiChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     
     return AppBar(
       leading: IconButton(
-        icon: const Icon(Icons.history),
+        icon: const Icon(Icons.history, size: 22),
         onPressed: () {
           // 导航到聊天历史列表页面，并提供AiChatRepository
           Navigator.of(context).push(
@@ -33,12 +35,25 @@ class AiChatAppBar extends StatelessWidget implements PreferredSizeWidget {
           );
         },
       ),
-      title: const Text('AI助手'),
+      title: Consumer<ModelProvider>(
+        builder: (context, modelProvider, child) {
+          return ModelSelector(
+            currentModel: modelProvider.currentModel,
+            onModelChanged: (model) {
+              // 更新模型提供者中的模型
+              modelProvider.changeModel(model);
+              // 更新repository中的模型
+              aiChatRepository.setModel(model);
+              // 移除SnackBar通知，只保留服务器日志记录
+            },
+          );
+        },
+      ),
       centerTitle: true,
       actions: [
         // 清除聊天记录按钮
         IconButton(
-          icon: const Icon(Icons.delete_outline),
+          icon: const Icon(Icons.delete_outline, size: 22),
           onPressed: () {
             showDialog(
               context: context,
@@ -65,7 +80,7 @@ class AiChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         // 查看帮助按钮
         IconButton(
-          icon: const Icon(Icons.help_outline),
+          icon: const Icon(Icons.help_outline, size: 22),
           onPressed: () {
             showDialog(
               context: context,

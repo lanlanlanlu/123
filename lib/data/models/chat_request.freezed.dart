@@ -38,6 +38,9 @@ mixin _$ChatRequest {
   /// 聊天ID - 用于记忆功能
   String get chatId => throw _privateConstructorUsedError;
 
+  /// 模型名称 - 指定要使用的模型
+  String get model => throw _privateConstructorUsedError;
+
   /// Serializes this ChatRequest to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -60,7 +63,8 @@ abstract class $ChatRequestCopyWith<$Res> {
       bool useRerank,
       String rerankLanguage,
       bool? useGraph,
-      String chatId});
+      String chatId,
+      String model});
 }
 
 /// @nodoc
@@ -84,6 +88,7 @@ class _$ChatRequestCopyWithImpl<$Res, $Val extends ChatRequest>
     Object? rerankLanguage = null,
     Object? useGraph = freezed,
     Object? chatId = null,
+    Object? model = null,
   }) {
     return _then(_value.copyWith(
       query: null == query
@@ -110,6 +115,10 @@ class _$ChatRequestCopyWithImpl<$Res, $Val extends ChatRequest>
           ? _value.chatId
           : chatId // ignore: cast_nullable_to_non_nullable
               as String,
+      model: null == model
+          ? _value.model
+          : model // ignore: cast_nullable_to_non_nullable
+              as String,
     ) as $Val);
   }
 }
@@ -128,7 +137,8 @@ abstract class _$$ChatRequestImplCopyWith<$Res>
       bool useRerank,
       String rerankLanguage,
       bool? useGraph,
-      String chatId});
+      String chatId,
+      String model});
 }
 
 /// @nodoc
@@ -150,6 +160,7 @@ class __$$ChatRequestImplCopyWithImpl<$Res>
     Object? rerankLanguage = null,
     Object? useGraph = freezed,
     Object? chatId = null,
+    Object? model = null,
   }) {
     return _then(_$ChatRequestImpl(
       query: null == query
@@ -176,6 +187,10 @@ class __$$ChatRequestImplCopyWithImpl<$Res>
           ? _value.chatId
           : chatId // ignore: cast_nullable_to_non_nullable
               as String,
+      model: null == model
+          ? _value.model
+          : model // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }
@@ -189,7 +204,8 @@ class _$ChatRequestImpl with DiagnosticableTreeMixin implements _ChatRequest {
       this.useRerank = true,
       this.rerankLanguage = 'auto',
       this.useGraph,
-      this.chatId = ''})
+      this.chatId = '',
+      this.model = 'gemini-2.5-flash'})
       : _references = references;
 
   factory _$ChatRequestImpl.fromJson(Map<String, dynamic> json) =>
@@ -230,9 +246,14 @@ class _$ChatRequestImpl with DiagnosticableTreeMixin implements _ChatRequest {
   @JsonKey()
   final String chatId;
 
+  /// 模型名称 - 指定要使用的模型
+  @override
+  @JsonKey()
+  final String model;
+
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'ChatRequest(query: $query, references: $references, useRerank: $useRerank, rerankLanguage: $rerankLanguage, useGraph: $useGraph, chatId: $chatId)';
+    return 'ChatRequest(query: $query, references: $references, useRerank: $useRerank, rerankLanguage: $rerankLanguage, useGraph: $useGraph, chatId: $chatId, model: $model)';
   }
 
   @override
@@ -245,7 +266,8 @@ class _$ChatRequestImpl with DiagnosticableTreeMixin implements _ChatRequest {
       ..add(DiagnosticsProperty('useRerank', useRerank))
       ..add(DiagnosticsProperty('rerankLanguage', rerankLanguage))
       ..add(DiagnosticsProperty('useGraph', useGraph))
-      ..add(DiagnosticsProperty('chatId', chatId));
+      ..add(DiagnosticsProperty('chatId', chatId))
+      ..add(DiagnosticsProperty('model', model));
   }
 
   @override
@@ -262,7 +284,8 @@ class _$ChatRequestImpl with DiagnosticableTreeMixin implements _ChatRequest {
                 other.rerankLanguage == rerankLanguage) &&
             (identical(other.useGraph, useGraph) ||
                 other.useGraph == useGraph) &&
-            (identical(other.chatId, chatId) || other.chatId == chatId));
+            (identical(other.chatId, chatId) || other.chatId == chatId) &&
+            (identical(other.model, model) || other.model == model));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -274,7 +297,8 @@ class _$ChatRequestImpl with DiagnosticableTreeMixin implements _ChatRequest {
       useRerank,
       rerankLanguage,
       useGraph,
-      chatId);
+      chatId,
+      model);
 
   /// Create a copy of ChatRequest
   /// with the given fields replaced by the non-null parameter values.
@@ -299,7 +323,8 @@ abstract class _ChatRequest implements ChatRequest {
       final bool useRerank,
       final String rerankLanguage,
       final bool? useGraph,
-      final String chatId}) = _$ChatRequestImpl;
+      final String chatId,
+      final String model}) = _$ChatRequestImpl;
 
   factory _ChatRequest.fromJson(Map<String, dynamic> json) =
       _$ChatRequestImpl.fromJson;
@@ -327,6 +352,10 @@ abstract class _ChatRequest implements ChatRequest {
   /// 聊天ID - 用于记忆功能
   @override
   String get chatId;
+
+  /// 模型名称 - 指定要使用的模型
+  @override
+  String get model;
 
   /// Create a copy of ChatRequest
   /// with the given fields replaced by the non-null parameter values.

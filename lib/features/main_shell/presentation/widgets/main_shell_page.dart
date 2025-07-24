@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart'; // 添加Provider导入
 import 'package:record_app/features/calendar/presentation/pages/calendar_page.dart';
 import 'package:record_app/features/home/presentation/pages/home_page.dart';
@@ -218,7 +219,9 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                 // 标题
                 Text(
                   '笔记',
-                  style: Theme.of(context).appBarTheme.titleTextStyle,
+                  style: Theme.of(context).appBarTheme.titleTextStyle?.copyWith(
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
                 const Spacer(),
                 // 右侧图标按钮
@@ -232,7 +235,10 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 IconButton(
                   icon: const Icon(Icons.search),
-                  onPressed: () => context.read<AppBarBloc>().add(AppBarSearchPressed()),
+                  onPressed: () {
+                    // 导航到搜索页面，使用push路径而不是pushNamed
+                    context.push('/search');
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.menu),
@@ -285,7 +291,7 @@ class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
                 '${selectedDate.month}月${selectedDate.day}日',
                 style: const TextStyle(
                   fontSize: 32,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w400,
                   color: Colors.black,
                 ),
               ),

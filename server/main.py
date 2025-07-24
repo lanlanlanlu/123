@@ -45,7 +45,7 @@ def convert_delta_to_plain_text(delta_json_string: str) -> str:
     result = "".join(text_parts).strip()
     return result
 
-# 我们只从核心包导入
+# 导入更完整的LlamaIndex组件
 from llama_index.core import (
     StorageContext,
     load_index_from_storage,
@@ -76,7 +76,8 @@ from llama_index.postprocessor.cohere_rerank import CohereRerank
 # 引入图存储和知识图谱索引
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
 from llama_index.core.query_engine.retriever_query_engine import RetrieverQueryEngine
-from llama_index.core.llms import MessageRole
+# 显式导入ChatMessage用于记忆功能
+from llama_index.core.llms import MessageRole, ChatMessage
 
 # --- 配置与初始化 ---
 PERSIST_DIR = "./storage"
@@ -368,6 +369,9 @@ class ChatRequest(BaseModel):
     # 使用Field指定别名，将前端的chatId映射到后端的chat_id
     chat_id: str = Field(default="", alias="chatId")  # 聊天ID，用于记忆功能
     
+    # 添加模型字段，用于指定使用的模型
+    model: Optional[str] = None
+    
     class Config:
         populate_by_name = True  # 允许通过别名填充字段
 
@@ -422,14 +426,64 @@ async def handle_chat_request(request: ChatRequest):
     处理聊天请求，使用混合搜索模式并支持重排序、图检索和记忆功能:
     - references: 引用列表，包含笔记、标签和地点的引用
     - use_rerank: 是否对检索结果进行重排序
-    - rerank_language: 重排序使用的语言模型，可选 auto, english, multilingual
+    - rerank_language: 重排序语言: auto, english, multilingual
     - use_graph: 是否使用图检索，可选true, false, null(自动决定)
     - chat_id: 聊天ID，用于记忆功能
+    - model: 指定使用的模型名称
     """
     # 添加详细的请求调试信息
     print(f"\n【请求调试】原始请求数据: {request}")
     print(f"【请求调试】chat_id值: '{request.chat_id}'")
     print(f"【请求调试】请求模型字段: {request.__fields__.keys()}")
+    
+    # 检测模型切换测试请求
+    is_model_switch_test = False
+    if request.query.startswith("模型切换测试") or request.query == "模型切换测试 - 请忽略":
+        is_model_switch_test = True
+        print(f"【检测】这是模型切换测试请求")
+    
+    # 处理客户端指定的模型参数
+    requested_model = getattr(request, "model", None)
+    if requested_model and requested_model in GEMINI_MODELS:
+        print(f"【模型】客户端请求使用模型: {requested_model}")
+    else:
+        requested_model = GEMINI_MODELS[0]  # 使用默认模型
+        print(f"【模型】未指定有效模型，使用默认模型: {requested_model}")
+    
+    # 记录使用的当前模型
+    current_model = getattr(Settings.llm, "model", GEMINI_MODELS[0])
+    used_model = current_model
+    
+    if requested_model != current_model:
+        print(f"\n{'='*50}")
+        print(f"【模型切换】从 {current_model} 切换到 {requested_model}")
+        print(f"{'='*50}\n")
+        try:
+            # 临时切换LLM模型
+            original_llm = Settings.llm
+            Settings.llm = GoogleGenAI(
+                model=requested_model,
+                api_key=api_key,
+                temperature=0.7,
+                retry_on_failure=True
+            )
+            used_model = requested_model
+            print(f"【模型切换】成功切换到 {requested_model} ✓")
+        except Exception as e:
+            print(f"【模型切换】切换到 {requested_model} 失败: {e}")
+            print(f"【模型切换】继续使用当前模型: {current_model}")
+    else:
+        print(f"【模型】当前使用: {current_model}")
+    
+    # 如果是模型切换测试请求，直接返回结果
+    if is_model_switch_test:
+        print(f"\n{'='*50}")
+        print(f"【模型切换测试】完成模型切换，当前使用: {used_model}")
+        print(f"{'='*50}\n")
+        return {
+            "response": f"模型已切换为: {used_model}",
+            "model": used_model
+        }
     
     if index is None:
         raise HTTPException(status_code=503, detail="服务不可用：索引未初始化。")
@@ -748,106 +802,41 @@ async def handle_chat_request(request: ChatRequest):
         full_response_text = response.response
         print(f"生成的回答: {full_response_text}")
         
-        # 最后，当成功获取响应后，保存记忆（如果有chat_id）
-        if request.chat_id:
-            print(f"\n【记忆管理】准备保存对话，chat_id: '{request.chat_id}'")
-            
-            # 检查chat_id是否为有效值
-            if not request.chat_id.strip():
-                print("【记忆管理】chat_id为空，跳过记忆保存")
-                return {"response": full_response_text}
-            
-            # 如果查询中包含已知人名，特别标注在记忆中
-            known_people = []
-            if entities.get("people"):
-                known_people = entities.get("people")
-                print(f"【记忆管理】检测到人名：{known_people}")
+        # 打印使用的模型信息
+        print(f"\n{'='*50}")
+        print(f"【响应完成】使用模型: {used_model}")
+        print(f"{'='*50}\n")
+        
+        # 7. 保存记忆（如果启用）
+        if memory_manager and request.chat_id and request.chat_id.strip():
+            try:
+                # 处理记忆保存
+                ai_message = ChatMessage(content=full_response_text, role=MessageRole.ASSISTANT)
+                human_message = ChatMessage(content=request.query, role=MessageRole.USER)
                 
-            # 创建更丰富的用户消息和AI回复
-            user_message = {
-                "role": "user", 
-                "content": original_query,  # 保存原始查询而不是重写的查询
-                "metadata": {"mentioned_people": known_people} if known_people else {}
-            }
-            
-            ai_message = {
-                "role": "assistant", 
-                "content": response.response
-            }
-            
-            # 打印详细的记忆信息以进行调试
-            print(f"【记忆管理】即将保存的消息: \n - 用户: {original_query}\n - AI: {response.response[:50]}...")
-            
-            # 保存到记忆
-            if memory_manager:
-                try:
-                    # 首先检查是否有现有记忆
-                    print(f"【记忆管理】检查是否存在现有记忆: '{request.chat_id}'")
-                    existing_memory = memory_manager.get_memory_content(request.chat_id)
-                    
-                    if existing_memory and existing_memory.get("messages"):
-                        msg_count = len(existing_memory.get("messages", []))
-                        print(f"【记忆管理】找到现有记忆，包含 {msg_count} 条消息")
-                        
-                        # 确保不重复保存相同消息
-                        all_messages = existing_memory.get("messages", [])
-                        
-                        # 检查这条消息是否已存在
-                        message_exists = False
-                        for msg in all_messages:
-                            if (msg.get("role") == "user" and 
-                                msg.get("content") == user_message["content"]):
-                                message_exists = True
-                                break
-                        
-                        if not message_exists:
-                            # 如果消息不存在，则追加新消息
-                            all_messages.append(user_message)
-                            all_messages.append(ai_message)
-                            success = memory_manager.save_memory(request.chat_id, all_messages)
-                            print(f"【记忆管理】添加新消息并保存记忆：{success}")
-                        else:
-                            print("【记忆管理】消息已存在，跳过保存")
-                    else:
-                        # 如果没有现有记忆，创建新记忆
-                        print(f"【记忆管理】没有找到现有记忆，创建新记忆")
-                        success = memory_manager.save_memory(request.chat_id, [user_message, ai_message])
-                        print(f"【记忆管理】创建新记忆：{success}")
-                    
-                    # 验证保存结果
-                    memory_content = memory_manager.get_memory_content(request.chat_id)
-                    msg_count = len(memory_content.get("messages", []))
-                    facts_count = len(memory_content.get("facts", [])) if "facts" in memory_content else 0
-                    print(f"【记忆管理】保存后的记忆包含 {msg_count} 条消息, {facts_count} 条事实")
-                    print(f"【记忆管理】存储路径: {memory_manager.storage_dir}/{request.chat_id}.json")
-                    
-                    # 检查文件是否实际存在
-                    import os
-                    memory_file = os.path.join(memory_manager.storage_dir, f"{request.chat_id}.json")
-                    if os.path.exists(memory_file):
-                        file_size = os.path.getsize(memory_file)
-                        print(f"【记忆管理】确认文件已创建: {memory_file}, 大小: {file_size} 字节")
-                    else:
-                        print(f"【记忆管理】警告: 文件未成功创建: {memory_file}")
-                        
-                except Exception as e:
-                    print(f"【记忆管理】保存记忆失败: {e}")
-                    import traceback
-                    print(f"【记忆管理】详细错误: {traceback.format_exc()}")
-            else:
-                print("【记忆管理】警告: memory_manager为None，无法保存记忆")
-        else:
-            print("【记忆管理】警告: 请求中没有提供chat_id，跳过记忆保存")
-        
-        # 返回回复，并包含查询重写信息（如果发生了重写）
-        response_data = {"response": full_response_text}
-        if original_query != rewritten_query:
-            response_data["query_info"] = {
-                "original": original_query,
-                "rewritten": rewritten_query
-            }
-        
-        return response_data
+                # 如果memory为None（可能是因为之前没有记忆），则创建一个新的memory对象
+                if memory is None:
+                    print(f"为chat_id {request.chat_id}创建新的记忆实例")
+                    memory = memory_manager.create_memory_instance(request.chat_id)
+                
+                # 逆序添加消息，确保最新的在前面
+                memory.put(ai_message)
+                memory.put(human_message)
+                
+                # 保存更新后的记忆
+                messages_to_save = memory.get_all()
+                result = memory_manager.save_memory(request.chat_id, messages_to_save)
+                print(f"记忆保存结果: {'成功' if result else '失败'}")
+            except Exception as memory_error:
+                print(f"保存记忆时出错: {memory_error}")
+                import traceback
+                print(f"详细错误: {traceback.format_exc()}")
+
+        # 返回格式化的响应对象
+        return {
+            "response": full_response_text, 
+            "model": used_model  # 添加使用的模型信息
+        }
         
     except ValueError as e:
         # 捕获值错误，如文档数量不足的错误

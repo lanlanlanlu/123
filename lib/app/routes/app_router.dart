@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:record_app/features/main_shell/presentation/widgets/main_shell_page.dart';
 import 'package:record_app/features/note_detail/presentation/pages/note_detail_page.dart';
 import 'package:record_app/data/database/database.dart'; // 导入 Note 类
+import 'package:record_app/features/home/presentation/pages/search_page.dart'; // 导入搜索页面
 
 // 1. 创建 GoRouter 配置
 final GoRouter router = GoRouter(
@@ -13,7 +14,7 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/',
       builder: (context, state) => const MainShellPage(),
-      // 定义一个子路由，用于笔记详情页
+      // 定义子路由
       routes: [
         GoRoute(
           name: 'noteDetail', // 给路由起个名字，方便调用
@@ -23,6 +24,11 @@ final GoRouter router = GoRouter(
             final note = state.extra as Note;
             return NoteDetailPage(note: note);
           },
+        ),
+        GoRoute(
+          // name: 'search', // 搜索路由名称
+          path: 'search', // 搜索路由路径
+          builder: (context, state) => const SearchPage(),
         ),
       ],
     ),
