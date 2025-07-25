@@ -1,0 +1,28 @@
+# ========== Core Application Dependencies ==========
+# Web Framework
+fastapi
+
+# Environment variables
+python-dotenv
+
+# LlamaIndex Core and Integrations
+llama-index
+llama-index-llms-google-genai
+llama-index-embeddings-google-genai
+llama-index-retrievers-bm25
+llama-index-postprocessor-cohere-rerank
+llama-index-graph-stores-neo4j
+
+# API Clients and Drivers
+cohere                  # For reranking search results
+neo4j                   # For Neo4j graph database
+googlemaps              # For geocoding locations
+tenacity                # For retrying API calls
+
+# Data Handling and Utilities
+pandas                  # For data manipulation, used in date_utils
+dateparser              # For parsing various date formats from text
+
+# ========== Development & Testing Dependencies ==========
+# Used for making HTTP requests in test scripts
+requests
