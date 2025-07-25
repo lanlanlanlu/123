@@ -16,6 +16,8 @@ import 'package:record_app/core/utils/search_service.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart'; // 1. 导入
+import 'firebase_options.dart'; // 2. 导入自动生成的文件
 
 // 添加语言管理Cubit
 class LocaleCubit extends Cubit<Locale?> {
@@ -34,6 +36,10 @@ late final ChatHistoryRepository _chatHistoryRepository;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp( // 5. 初始化Firebase
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // 初始化中文日期格式
   await initializeDateFormatting('zh_CN', null);

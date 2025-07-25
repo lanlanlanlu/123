@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "399081121182",
+    "project_id": "record-app-466923",
+    "storage_bucket": "record-app-466923.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:399081121182:android:5582157686abac8ed8e28f",
+        "android_client_info": {
+          "package_name": "rxl406.record_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9bjZshqJVGenPEmx-TDj0e99Yn59TImw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
