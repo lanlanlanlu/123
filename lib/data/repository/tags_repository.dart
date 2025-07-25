@@ -1,11 +1,12 @@
 import 'package:drift/drift.dart';
 import 'package:record_app/data/database/database.dart';
+import 'package:record_app/data/database/connection/connection.dart' as connection;
 
 /// 标签数据仓库，封装所有与标签相关的数据操作
 class TagsRepository {
   final AppDatabase _database;
 
-  TagsRepository(this._database);
+  TagsRepository([AppDatabase? database]) : _database = database ?? connection.connect();
 
   /// 监听所有标签
   Stream<List<Tag>> watchAllTags() {
@@ -62,8 +63,13 @@ class TagsRepository {
   Future<void> addTagToNote(int noteId, String tagName) async {
     return _database.transaction(() async {
       // 先确保标签存在，如果不存在就创建
+      final now = DateTime.now();
       final tagId = await _database.into(_database.tags).insert(
-        TagsCompanion.insert(name: tagName),
+        TagsCompanion.insert(
+          name: tagName,
+          syncStatus: const Value('pending'), // 新标签标记为待同步
+          updatedAt: Value(now),
+        ),
         onConflict: DoNothing(target: [_database.tags.name]),
       );
       
@@ -73,19 +79,51 @@ class TagsRepository {
           .getSingle()
           .then((t) => t.id);
       
+      // 如果标签已存在且有Firestore ID，将其标记为dirty
+      if (tagId <= 0) {
+        final existingTag = await (_database.select(_database.tags)
+          ..where((t) => t.id.equals(finalTagId)))
+          .getSingle();
+          
+        if (existingTag.firestoreId != null) {
+          await (_database.update(_database.tags)..where((t) => t.id.equals(finalTagId)))
+            .write(TagsCompanion(
+              syncStatus: const Value('dirty'),
+              updatedAt: Value(now),
+            ));
+        }
+      }
+      
       // 添加标签关联
       await _database.into(_database.noteTags).insert(
         NoteTagsCompanion.insert(noteId: noteId, tagId: finalTagId),
         onConflict: DoNothing(target: [_database.noteTags.noteId, _database.noteTags.tagId]),
       );
+      
+      // 更新笔记的同步状态
+      await (_database.update(_database.notes)..where((n) => n.id.equals(noteId)))
+        .write(NotesCompanion(
+          syncStatus: const Value('dirty'),
+          updatedAt: Value(now),
+        ));
     });
   }
   
   /// 从笔记中删除标签
   Future<void> removeTagFromNote(int noteId, int tagId) async {
-    await (_database.delete(_database.noteTags)
-      ..where((t) => t.noteId.equals(noteId) & t.tagId.equals(tagId)))
-      .go();
+    final now = DateTime.now();
+    await _database.transaction(() async {
+      await (_database.delete(_database.noteTags)
+        ..where((t) => t.noteId.equals(noteId) & t.tagId.equals(tagId)))
+        .go();
+      
+      // 更新笔记的同步状态
+      await (_database.update(_database.notes)..where((n) => n.id.equals(noteId)))
+        .write(NotesCompanion(
+          syncStatus: const Value('dirty'),
+          updatedAt: Value(now),
+        ));
+    });
   }
   
   /// 删除标签（从所有笔记中移除该标签的关联）
@@ -101,18 +139,44 @@ class TagsRepository {
         return; // 标签不存在，无需删除
       }
       
+      // 如果有firestoreId，标记为pendingDelete而不是立即删除
+      if (tag.firestoreId != null) {
+        await (_database.update(_database.tags)..where((t) => t.id.equals(tag.id)))
+          .write(const TagsCompanion(
+            syncStatus: Value('pendingDelete'),
+          ));
+      }
+      
       // 2. 删除所有笔记与该标签的关联
       await (_database.delete(_database.noteTags)
         ..where((nt) => nt.tagId.equals(tag.id)))
         .go();
       
-      // 3. 删除标签本身
-      await (_database.delete(_database.tags)
-        ..where((t) => t.id.equals(tag.id)))
-        .go();
+      // 3. 删除标签本身（或者如果已标记为待删除，保留其记录直到同步）
+      if (tag.firestoreId == null) {
+        await (_database.delete(_database.tags)
+          ..where((t) => t.id.equals(tag.id)))
+          .go();
+      }
       
     } catch (e) {
       throw Exception('删除标签失败: $e');
     }
+  }
+  
+  /// 更新标签
+  Future<bool> updateTag(Tag tag) async {
+    // 标记为dirty
+    final tagCompanion = TagsCompanion(
+      id: Value(tag.id),
+      name: Value(tag.name),
+      syncStatus: const Value('dirty'),
+      updatedAt: Value(DateTime.now()),
+    );
+    
+    return await (_database.update(_database.tags)..where((t) => t.id.equals(tag.id)))
+      .write(tagCompanion)
+      .then((_) => true)
+      .catchError((_) => false);
   }
 } 

@@ -6,10 +6,13 @@ import 'package:record_app/data/database/database.dart';
 import 'package:record_app/data/repository/index.dart';
 import 'package:record_app/features/note_detail/presentation/bloc/note_detail_event.dart';
 import 'package:record_app/features/note_detail/presentation/bloc/note_detail_state.dart';
+import 'package:record_app/core/services/sync_service.dart'; // 导入SyncService
+import 'package:flutter/foundation.dart' show debugPrint;
 
 class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
   final NotesRepository _notesRepository;
   final TagsRepository _tagsRepository;
+  final SyncService _syncService; // 添加SyncService依赖
   
   // 保存笔记和标签流订阅，以便在BLoC销毁时取消订阅
   StreamSubscription? _noteSubscription;
@@ -21,8 +24,10 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
   NoteDetailBloc({
     required NotesRepository notesRepository,
     required TagsRepository tagsRepository,
+    required SyncService syncService, // 在构造函数中接收SyncService
   }) : _notesRepository = notesRepository,
        _tagsRepository = tagsRepository,
+       _syncService = syncService, // 初始化SyncService
        super(const NoteDetailInitial()) {
     on<NoteDetailLoadNote>(_onLoadNote);
     on<NoteDetailUpdateContent>(_onUpdateContent);
@@ -205,6 +210,11 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
           hasImageChanges: false,
           imageChangeCount: 0,
         ));
+        
+        // 【新增】在后台触发同步
+        _syncService.performFullSync().catchError((e) {
+          debugPrint('保存笔记后同步失败: $e');
+        });
         
         // 恢复更新后的状态
         emit(currentState.copyWith(

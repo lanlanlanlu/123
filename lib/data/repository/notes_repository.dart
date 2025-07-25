@@ -120,16 +120,37 @@ class NotesRepository {
 
   /// 插入一条新笔记
   Future<int> insertNote(NotesCompanion note) {
-    return _database.noteDao.insertNote(note);
+    // 插入时，默认将 syncStatus 设为 'pending'
+    final companionWithStatus = note.copyWith(
+      syncStatus: const Value('pending')
+    );
+    return _database.noteDao.insertNote(companionWithStatus);
   }
 
   /// 更新笔记
   Future<bool> updateNote(NotesCompanion note) {
-    return _database.noteDao.updateNote(note);
+    // 更新时，将 syncStatus 设为 'dirty'
+    final companionWithStatus = note.copyWith(
+      syncStatus: const Value('dirty'),
+      updatedAt: Value(DateTime.now()),
+    );
+    return _database.noteDao.updateNote(companionWithStatus);
   }
 
   /// 软删除笔记
-  Future<int> softDeleteNote(int id) {
+  Future<int> softDeleteNote(int id) async {
+    // 先获取笔记，检查是否已同步到云端
+    final note = await _database.noteDao.getNoteById(id);
+    
+    // 如果有 firestoreId，说明已同步到云端，标记为待删除
+    if (note.firestoreId != null) {
+      await (_database.update(_database.notes)..where((tbl) => tbl.id.equals(id)))
+        .write(const NotesCompanion(
+          syncStatus: Value('pendingDelete'),
+        ));
+    }
+    
+    // 然后进行软删除
     return _database.noteDao.softDeleteNote(id);
   }
 
@@ -181,12 +202,24 @@ class NotesRepository {
             .get();
         final oldTagNames = oldTags.map((row) => row.readTable(_database.tags).name).toSet();
         finalTagNames.addAll(oldTagNames);
+        
+        // 获取笔记的当前同步状态
+        final note = await _database.noteDao.getNoteById(noteId);
+        
+        // 根据同步状态决定如何更新
+        String syncStatus = 'dirty';
+        if (note.firestoreId == null || note.syncStatus == 'pending') {
+          // 如果笔记还没有firestoreId或者原状态是pending，保持pending状态
+          syncStatus = 'pending';
+        }
+        
         final companion = NotesCompanion(
           id: Value(noteId),
           title: Value(title),
           content: Value(contentToSave),
           locationInfo: Value(locationToSave),
           updatedAt: Value(now),
+          syncStatus: Value(syncStatus),
         );
         await (_database.update(_database.notes)..where((t) => t.id.equals(noteId))).write(companion);
         
@@ -199,6 +232,7 @@ class NotesRepository {
           locationInfo: Value(locationToSave),
           createdAt: Value(now),
           updatedAt: Value(now),
+          syncStatus: const Value('pending'), // 确保新笔记标记为"待上传"
         );
         noteId = await _database.into(_database.notes).insert(companion);
       }
@@ -330,5 +364,26 @@ class NotesRepository {
   Future<bool> getNoteThumbnailMode(int noteId) async {
     final note = await _database.noteDao.getNoteById(noteId);
     return note.thumbnailMode;
+  }
+
+  /// 修复笔记的同步状态
+  /// 将所有没有firestoreId但状态为dirty的笔记改为pending状态
+  Future<int> fixNoteSyncStatus() async {
+    final allNotes = await _database.noteDao.getAllNotes();
+    int fixedCount = 0;
+    
+    for (final note in allNotes) {
+      if (note.syncStatus == 'dirty' && note.firestoreId == null) {
+        await _database.updateSyncStatus(
+          note.id,
+          'notes',
+          'pending',
+          null,
+        );
+        fixedCount++;
+      }
+    }
+    
+    return fixedCount;
   }
 } 

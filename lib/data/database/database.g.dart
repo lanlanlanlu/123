@@ -97,6 +97,26 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       clientDefault: () => DateTime.now());
+  static const VerificationMeta _firestoreIdMeta =
+      const VerificationMeta('firestoreId');
+  @override
+  late final GeneratedColumn<String> firestoreId = GeneratedColumn<String>(
+      'firestore_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
+  static const VerificationMeta _lastSyncedAtMeta =
+      const VerificationMeta('lastSyncedAt');
+  @override
+  late final GeneratedColumn<DateTime> lastSyncedAt = GeneratedColumn<DateTime>(
+      'last_synced_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -109,7 +129,10 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
         isDeleted,
         thumbnailMode,
         createdAt,
-        updatedAt
+        updatedAt,
+        firestoreId,
+        syncStatus,
+        lastSyncedAt
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -174,6 +197,24 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
       context.handle(_updatedAtMeta,
           updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
     }
+    if (data.containsKey('firestore_id')) {
+      context.handle(
+          _firestoreIdMeta,
+          firestoreId.isAcceptableOrUnknown(
+              data['firestore_id']!, _firestoreIdMeta));
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+          _lastSyncedAtMeta,
+          lastSyncedAt.isAcceptableOrUnknown(
+              data['last_synced_at']!, _lastSyncedAtMeta));
+    }
     return context;
   }
 
@@ -205,6 +246,12 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      firestoreId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}firestore_id']),
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}last_synced_at']),
     );
   }
 
@@ -226,6 +273,9 @@ class Note extends DataClass implements Insertable<Note> {
   final bool thumbnailMode;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? firestoreId;
+  final String syncStatus;
+  final DateTime? lastSyncedAt;
   const Note(
       {required this.id,
       required this.title,
@@ -237,7 +287,10 @@ class Note extends DataClass implements Insertable<Note> {
       required this.isDeleted,
       required this.thumbnailMode,
       required this.createdAt,
-      required this.updatedAt});
+      required this.updatedAt,
+      this.firestoreId,
+      required this.syncStatus,
+      this.lastSyncedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -256,6 +309,13 @@ class Note extends DataClass implements Insertable<Note> {
     map['thumbnail_mode'] = Variable<bool>(thumbnailMode);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || firestoreId != null) {
+      map['firestore_id'] = Variable<String>(firestoreId);
+    }
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || lastSyncedAt != null) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
+    }
     return map;
   }
 
@@ -275,6 +335,13 @@ class Note extends DataClass implements Insertable<Note> {
       thumbnailMode: Value(thumbnailMode),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      firestoreId: firestoreId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firestoreId),
+      syncStatus: Value(syncStatus),
+      lastSyncedAt: lastSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedAt),
     );
   }
 
@@ -293,6 +360,9 @@ class Note extends DataClass implements Insertable<Note> {
       thumbnailMode: serializer.fromJson<bool>(json['thumbnailMode']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      firestoreId: serializer.fromJson<String?>(json['firestoreId']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastSyncedAt: serializer.fromJson<DateTime?>(json['lastSyncedAt']),
     );
   }
   @override
@@ -310,6 +380,9 @@ class Note extends DataClass implements Insertable<Note> {
       'thumbnailMode': serializer.toJson<bool>(thumbnailMode),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'firestoreId': serializer.toJson<String?>(firestoreId),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastSyncedAt': serializer.toJson<DateTime?>(lastSyncedAt),
     };
   }
 
@@ -324,7 +397,10 @@ class Note extends DataClass implements Insertable<Note> {
           bool? isDeleted,
           bool? thumbnailMode,
           DateTime? createdAt,
-          DateTime? updatedAt}) =>
+          DateTime? updatedAt,
+          Value<String?> firestoreId = const Value.absent(),
+          String? syncStatus,
+          Value<DateTime?> lastSyncedAt = const Value.absent()}) =>
       Note(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -338,6 +414,10 @@ class Note extends DataClass implements Insertable<Note> {
         thumbnailMode: thumbnailMode ?? this.thumbnailMode,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        firestoreId: firestoreId.present ? firestoreId.value : this.firestoreId,
+        syncStatus: syncStatus ?? this.syncStatus,
+        lastSyncedAt:
+            lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
       );
   Note copyWithCompanion(NotesCompanion data) {
     return Note(
@@ -357,6 +437,13 @@ class Note extends DataClass implements Insertable<Note> {
           : this.thumbnailMode,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      firestoreId:
+          data.firestoreId.present ? data.firestoreId.value : this.firestoreId,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
     );
   }
 
@@ -373,14 +460,30 @@ class Note extends DataClass implements Insertable<Note> {
           ..write('isDeleted: $isDeleted, ')
           ..write('thumbnailMode: $thumbnailMode, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('firestoreId: $firestoreId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, content, locationInfo, color,
-      isPinned, isArchived, isDeleted, thumbnailMode, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+      id,
+      title,
+      content,
+      locationInfo,
+      color,
+      isPinned,
+      isArchived,
+      isDeleted,
+      thumbnailMode,
+      createdAt,
+      updatedAt,
+      firestoreId,
+      syncStatus,
+      lastSyncedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -395,7 +498,10 @@ class Note extends DataClass implements Insertable<Note> {
           other.isDeleted == this.isDeleted &&
           other.thumbnailMode == this.thumbnailMode &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.firestoreId == this.firestoreId &&
+          other.syncStatus == this.syncStatus &&
+          other.lastSyncedAt == this.lastSyncedAt);
 }
 
 class NotesCompanion extends UpdateCompanion<Note> {
@@ -410,6 +516,9 @@ class NotesCompanion extends UpdateCompanion<Note> {
   final Value<bool> thumbnailMode;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<String?> firestoreId;
+  final Value<String> syncStatus;
+  final Value<DateTime?> lastSyncedAt;
   const NotesCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -422,6 +531,9 @@ class NotesCompanion extends UpdateCompanion<Note> {
     this.thumbnailMode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.firestoreId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   });
   NotesCompanion.insert({
     this.id = const Value.absent(),
@@ -435,6 +547,9 @@ class NotesCompanion extends UpdateCompanion<Note> {
     this.thumbnailMode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.firestoreId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   })  : title = Value(title),
         content = Value(content);
   static Insertable<Note> custom({
@@ -449,6 +564,9 @@ class NotesCompanion extends UpdateCompanion<Note> {
     Expression<bool>? thumbnailMode,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<String>? firestoreId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? lastSyncedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -462,6 +580,9 @@ class NotesCompanion extends UpdateCompanion<Note> {
       if (thumbnailMode != null) 'thumbnail_mode': thumbnailMode,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (firestoreId != null) 'firestore_id': firestoreId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
     });
   }
 
@@ -476,7 +597,10 @@ class NotesCompanion extends UpdateCompanion<Note> {
       Value<bool>? isDeleted,
       Value<bool>? thumbnailMode,
       Value<DateTime>? createdAt,
-      Value<DateTime>? updatedAt}) {
+      Value<DateTime>? updatedAt,
+      Value<String?>? firestoreId,
+      Value<String>? syncStatus,
+      Value<DateTime?>? lastSyncedAt}) {
     return NotesCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -489,6 +613,9 @@ class NotesCompanion extends UpdateCompanion<Note> {
       thumbnailMode: thumbnailMode ?? this.thumbnailMode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      firestoreId: firestoreId ?? this.firestoreId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     );
   }
 
@@ -528,6 +655,15 @@ class NotesCompanion extends UpdateCompanion<Note> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (firestoreId.present) {
+      map['firestore_id'] = Variable<String>(firestoreId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt.value);
+    }
     return map;
   }
 
@@ -544,7 +680,10 @@ class NotesCompanion extends UpdateCompanion<Note> {
           ..write('isDeleted: $isDeleted, ')
           ..write('thumbnailMode: $thumbnailMode, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('firestoreId: $firestoreId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
@@ -572,8 +711,37 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
           GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 50),
       type: DriftSqlType.string,
       requiredDuringInsert: true);
+  static const VerificationMeta _firestoreIdMeta =
+      const VerificationMeta('firestoreId');
   @override
-  List<GeneratedColumn> get $columns => [id, name];
+  late final GeneratedColumn<String> firestoreId = GeneratedColumn<String>(
+      'firestore_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
+  static const VerificationMeta _lastSyncedAtMeta =
+      const VerificationMeta('lastSyncedAt');
+  @override
+  late final GeneratedColumn<DateTime> lastSyncedAt = GeneratedColumn<DateTime>(
+      'last_synced_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      clientDefault: () => DateTime.now());
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, name, firestoreId, syncStatus, lastSyncedAt, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -593,6 +761,28 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
+    if (data.containsKey('firestore_id')) {
+      context.handle(
+          _firestoreIdMeta,
+          firestoreId.isAcceptableOrUnknown(
+              data['firestore_id']!, _firestoreIdMeta));
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+          _lastSyncedAtMeta,
+          lastSyncedAt.isAcceptableOrUnknown(
+              data['last_synced_at']!, _lastSyncedAtMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
     return context;
   }
 
@@ -610,6 +800,14 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       name: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      firestoreId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}firestore_id']),
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}last_synced_at']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
   }
 
@@ -622,12 +820,30 @@ class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
 class Tag extends DataClass implements Insertable<Tag> {
   final int id;
   final String name;
-  const Tag({required this.id, required this.name});
+  final String? firestoreId;
+  final String syncStatus;
+  final DateTime? lastSyncedAt;
+  final DateTime updatedAt;
+  const Tag(
+      {required this.id,
+      required this.name,
+      this.firestoreId,
+      required this.syncStatus,
+      this.lastSyncedAt,
+      required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['name'] = Variable<String>(name);
+    if (!nullToAbsent || firestoreId != null) {
+      map['firestore_id'] = Variable<String>(firestoreId);
+    }
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || lastSyncedAt != null) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -635,6 +851,14 @@ class Tag extends DataClass implements Insertable<Tag> {
     return TagsCompanion(
       id: Value(id),
       name: Value(name),
+      firestoreId: firestoreId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firestoreId),
+      syncStatus: Value(syncStatus),
+      lastSyncedAt: lastSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -644,6 +868,10 @@ class Tag extends DataClass implements Insertable<Tag> {
     return Tag(
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      firestoreId: serializer.fromJson<String?>(json['firestoreId']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastSyncedAt: serializer.fromJson<DateTime?>(json['lastSyncedAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -652,17 +880,41 @@ class Tag extends DataClass implements Insertable<Tag> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
+      'firestoreId': serializer.toJson<String?>(firestoreId),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastSyncedAt': serializer.toJson<DateTime?>(lastSyncedAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
-  Tag copyWith({int? id, String? name}) => Tag(
+  Tag copyWith(
+          {int? id,
+          String? name,
+          Value<String?> firestoreId = const Value.absent(),
+          String? syncStatus,
+          Value<DateTime?> lastSyncedAt = const Value.absent(),
+          DateTime? updatedAt}) =>
+      Tag(
         id: id ?? this.id,
         name: name ?? this.name,
+        firestoreId: firestoreId.present ? firestoreId.value : this.firestoreId,
+        syncStatus: syncStatus ?? this.syncStatus,
+        lastSyncedAt:
+            lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
+        updatedAt: updatedAt ?? this.updatedAt,
       );
   Tag copyWithCompanion(TagsCompanion data) {
     return Tag(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      firestoreId:
+          data.firestoreId.present ? data.firestoreId.value : this.firestoreId,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -670,44 +922,85 @@ class Tag extends DataClass implements Insertable<Tag> {
   String toString() {
     return (StringBuffer('Tag(')
           ..write('id: $id, ')
-          ..write('name: $name')
+          ..write('name: $name, ')
+          ..write('firestoreId: $firestoreId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name);
+  int get hashCode =>
+      Object.hash(id, name, firestoreId, syncStatus, lastSyncedAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Tag && other.id == this.id && other.name == this.name);
+      (other is Tag &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.firestoreId == this.firestoreId &&
+          other.syncStatus == this.syncStatus &&
+          other.lastSyncedAt == this.lastSyncedAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class TagsCompanion extends UpdateCompanion<Tag> {
   final Value<int> id;
   final Value<String> name;
+  final Value<String?> firestoreId;
+  final Value<String> syncStatus;
+  final Value<DateTime?> lastSyncedAt;
+  final Value<DateTime> updatedAt;
   const TagsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.firestoreId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
   });
   TagsCompanion.insert({
     this.id = const Value.absent(),
     required String name,
+    this.firestoreId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Tag> custom({
     Expression<int>? id,
     Expression<String>? name,
+    Expression<String>? firestoreId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? lastSyncedAt,
+    Expression<DateTime>? updatedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (firestoreId != null) 'firestore_id': firestoreId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
     });
   }
 
-  TagsCompanion copyWith({Value<int>? id, Value<String>? name}) {
+  TagsCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? name,
+      Value<String?>? firestoreId,
+      Value<String>? syncStatus,
+      Value<DateTime?>? lastSyncedAt,
+      Value<DateTime>? updatedAt}) {
     return TagsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      firestoreId: firestoreId ?? this.firestoreId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -720,6 +1013,18 @@ class TagsCompanion extends UpdateCompanion<Tag> {
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
+    if (firestoreId.present) {
+      map['firestore_id'] = Variable<String>(firestoreId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     return map;
   }
 
@@ -727,7 +1032,11 @@ class TagsCompanion extends UpdateCompanion<Tag> {
   String toString() {
     return (StringBuffer('TagsCompanion(')
           ..write('id: $id, ')
-          ..write('name: $name')
+          ..write('name: $name, ')
+          ..write('firestoreId: $firestoreId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -1727,9 +2036,38 @@ class $ChatHistoriesTable extends ChatHistories
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       clientDefault: () => DateTime.now());
+  static const VerificationMeta _firestoreIdMeta =
+      const VerificationMeta('firestoreId');
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, title, lastMessage, messageCount, createdAt, updatedAt];
+  late final GeneratedColumn<String> firestoreId = GeneratedColumn<String>(
+      'firestore_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
+  static const VerificationMeta _lastSyncedAtMeta =
+      const VerificationMeta('lastSyncedAt');
+  @override
+  late final GeneratedColumn<DateTime> lastSyncedAt = GeneratedColumn<DateTime>(
+      'last_synced_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        title,
+        lastMessage,
+        messageCount,
+        createdAt,
+        updatedAt,
+        firestoreId,
+        syncStatus,
+        lastSyncedAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1769,6 +2107,24 @@ class $ChatHistoriesTable extends ChatHistories
       context.handle(_updatedAtMeta,
           updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
     }
+    if (data.containsKey('firestore_id')) {
+      context.handle(
+          _firestoreIdMeta,
+          firestoreId.isAcceptableOrUnknown(
+              data['firestore_id']!, _firestoreIdMeta));
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+          _lastSyncedAtMeta,
+          lastSyncedAt.isAcceptableOrUnknown(
+              data['last_synced_at']!, _lastSyncedAtMeta));
+    }
     return context;
   }
 
@@ -1790,6 +2146,12 @@ class $ChatHistoriesTable extends ChatHistories
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      firestoreId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}firestore_id']),
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}last_synced_at']),
     );
   }
 
@@ -1806,13 +2168,19 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
   final int messageCount;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? firestoreId;
+  final String syncStatus;
+  final DateTime? lastSyncedAt;
   const ChatHistory(
       {required this.id,
       required this.title,
       this.lastMessage,
       required this.messageCount,
       required this.createdAt,
-      required this.updatedAt});
+      required this.updatedAt,
+      this.firestoreId,
+      required this.syncStatus,
+      this.lastSyncedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1824,6 +2192,13 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
     map['message_count'] = Variable<int>(messageCount);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || firestoreId != null) {
+      map['firestore_id'] = Variable<String>(firestoreId);
+    }
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || lastSyncedAt != null) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
+    }
     return map;
   }
 
@@ -1837,6 +2212,13 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
       messageCount: Value(messageCount),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      firestoreId: firestoreId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firestoreId),
+      syncStatus: Value(syncStatus),
+      lastSyncedAt: lastSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedAt),
     );
   }
 
@@ -1850,6 +2232,9 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
       messageCount: serializer.fromJson<int>(json['messageCount']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      firestoreId: serializer.fromJson<String?>(json['firestoreId']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastSyncedAt: serializer.fromJson<DateTime?>(json['lastSyncedAt']),
     );
   }
   @override
@@ -1862,6 +2247,9 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
       'messageCount': serializer.toJson<int>(messageCount),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'firestoreId': serializer.toJson<String?>(firestoreId),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastSyncedAt': serializer.toJson<DateTime?>(lastSyncedAt),
     };
   }
 
@@ -1871,7 +2259,10 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
           Value<String?> lastMessage = const Value.absent(),
           int? messageCount,
           DateTime? createdAt,
-          DateTime? updatedAt}) =>
+          DateTime? updatedAt,
+          Value<String?> firestoreId = const Value.absent(),
+          String? syncStatus,
+          Value<DateTime?> lastSyncedAt = const Value.absent()}) =>
       ChatHistory(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -1879,6 +2270,10 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
         messageCount: messageCount ?? this.messageCount,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        firestoreId: firestoreId.present ? firestoreId.value : this.firestoreId,
+        syncStatus: syncStatus ?? this.syncStatus,
+        lastSyncedAt:
+            lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
       );
   ChatHistory copyWithCompanion(ChatHistoriesCompanion data) {
     return ChatHistory(
@@ -1891,6 +2286,13 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
           : this.messageCount,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      firestoreId:
+          data.firestoreId.present ? data.firestoreId.value : this.firestoreId,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
     );
   }
 
@@ -1902,14 +2304,17 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
           ..write('lastMessage: $lastMessage, ')
           ..write('messageCount: $messageCount, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('firestoreId: $firestoreId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, lastMessage, messageCount, createdAt, updatedAt);
+  int get hashCode => Object.hash(id, title, lastMessage, messageCount,
+      createdAt, updatedAt, firestoreId, syncStatus, lastSyncedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1919,7 +2324,10 @@ class ChatHistory extends DataClass implements Insertable<ChatHistory> {
           other.lastMessage == this.lastMessage &&
           other.messageCount == this.messageCount &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.firestoreId == this.firestoreId &&
+          other.syncStatus == this.syncStatus &&
+          other.lastSyncedAt == this.lastSyncedAt);
 }
 
 class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
@@ -1929,6 +2337,9 @@ class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
   final Value<int> messageCount;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<String?> firestoreId;
+  final Value<String> syncStatus;
+  final Value<DateTime?> lastSyncedAt;
   const ChatHistoriesCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -1936,6 +2347,9 @@ class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
     this.messageCount = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.firestoreId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   });
   ChatHistoriesCompanion.insert({
     this.id = const Value.absent(),
@@ -1944,6 +2358,9 @@ class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
     this.messageCount = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.firestoreId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
   }) : title = Value(title);
   static Insertable<ChatHistory> custom({
     Expression<int>? id,
@@ -1952,6 +2369,9 @@ class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
     Expression<int>? messageCount,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<String>? firestoreId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? lastSyncedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1960,6 +2380,9 @@ class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
       if (messageCount != null) 'message_count': messageCount,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (firestoreId != null) 'firestore_id': firestoreId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
     });
   }
 
@@ -1969,7 +2392,10 @@ class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
       Value<String?>? lastMessage,
       Value<int>? messageCount,
       Value<DateTime>? createdAt,
-      Value<DateTime>? updatedAt}) {
+      Value<DateTime>? updatedAt,
+      Value<String?>? firestoreId,
+      Value<String>? syncStatus,
+      Value<DateTime?>? lastSyncedAt}) {
     return ChatHistoriesCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -1977,6 +2403,9 @@ class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
       messageCount: messageCount ?? this.messageCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      firestoreId: firestoreId ?? this.firestoreId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     );
   }
 
@@ -2001,6 +2430,15 @@ class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (firestoreId.present) {
+      map['firestore_id'] = Variable<String>(firestoreId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt.value);
+    }
     return map;
   }
 
@@ -2012,7 +2450,10 @@ class ChatHistoriesCompanion extends UpdateCompanion<ChatHistory> {
           ..write('lastMessage: $lastMessage, ')
           ..write('messageCount: $messageCount, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('firestoreId: $firestoreId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
           ..write(')'))
         .toString();
   }
@@ -2073,6 +2514,34 @@ class $ChatMessagesTable extends ChatMessages
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       clientDefault: () => DateTime.now());
+  static const VerificationMeta _firestoreIdMeta =
+      const VerificationMeta('firestoreId');
+  @override
+  late final GeneratedColumn<String> firestoreId = GeneratedColumn<String>(
+      'firestore_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
+  static const VerificationMeta _lastSyncedAtMeta =
+      const VerificationMeta('lastSyncedAt');
+  @override
+  late final GeneratedColumn<DateTime> lastSyncedAt = GeneratedColumn<DateTime>(
+      'last_synced_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      clientDefault: () => DateTime.now());
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2081,7 +2550,11 @@ class $ChatMessagesTable extends ChatMessages
         sender,
         mentionItems,
         sequenceNumber,
-        createdAt
+        createdAt,
+        firestoreId,
+        syncStatus,
+        lastSyncedAt,
+        updatedAt
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2134,6 +2607,28 @@ class $ChatMessagesTable extends ChatMessages
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     }
+    if (data.containsKey('firestore_id')) {
+      context.handle(
+          _firestoreIdMeta,
+          firestoreId.isAcceptableOrUnknown(
+              data['firestore_id']!, _firestoreIdMeta));
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+          _lastSyncedAtMeta,
+          lastSyncedAt.isAcceptableOrUnknown(
+              data['last_synced_at']!, _lastSyncedAtMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
     return context;
   }
 
@@ -2157,6 +2652,14 @@ class $ChatMessagesTable extends ChatMessages
           .read(DriftSqlType.int, data['${effectivePrefix}sequence_number'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      firestoreId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}firestore_id']),
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}last_synced_at']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
   }
 
@@ -2174,6 +2677,10 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
   final String? mentionItems;
   final int sequenceNumber;
   final DateTime createdAt;
+  final String? firestoreId;
+  final String syncStatus;
+  final DateTime? lastSyncedAt;
+  final DateTime updatedAt;
   const ChatMessage(
       {required this.id,
       required this.chatHistoryId,
@@ -2181,7 +2688,11 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
       required this.sender,
       this.mentionItems,
       required this.sequenceNumber,
-      required this.createdAt});
+      required this.createdAt,
+      this.firestoreId,
+      required this.syncStatus,
+      this.lastSyncedAt,
+      required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2194,6 +2705,14 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
     }
     map['sequence_number'] = Variable<int>(sequenceNumber);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || firestoreId != null) {
+      map['firestore_id'] = Variable<String>(firestoreId);
+    }
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || lastSyncedAt != null) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -2208,6 +2727,14 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
           : Value(mentionItems),
       sequenceNumber: Value(sequenceNumber),
       createdAt: Value(createdAt),
+      firestoreId: firestoreId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firestoreId),
+      syncStatus: Value(syncStatus),
+      lastSyncedAt: lastSyncedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncedAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -2222,6 +2749,10 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
       mentionItems: serializer.fromJson<String?>(json['mentionItems']),
       sequenceNumber: serializer.fromJson<int>(json['sequenceNumber']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      firestoreId: serializer.fromJson<String?>(json['firestoreId']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastSyncedAt: serializer.fromJson<DateTime?>(json['lastSyncedAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -2235,6 +2766,10 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
       'mentionItems': serializer.toJson<String?>(mentionItems),
       'sequenceNumber': serializer.toJson<int>(sequenceNumber),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'firestoreId': serializer.toJson<String?>(firestoreId),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastSyncedAt': serializer.toJson<DateTime?>(lastSyncedAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
@@ -2245,7 +2780,11 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
           String? sender,
           Value<String?> mentionItems = const Value.absent(),
           int? sequenceNumber,
-          DateTime? createdAt}) =>
+          DateTime? createdAt,
+          Value<String?> firestoreId = const Value.absent(),
+          String? syncStatus,
+          Value<DateTime?> lastSyncedAt = const Value.absent(),
+          DateTime? updatedAt}) =>
       ChatMessage(
         id: id ?? this.id,
         chatHistoryId: chatHistoryId ?? this.chatHistoryId,
@@ -2255,6 +2794,11 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
             mentionItems.present ? mentionItems.value : this.mentionItems,
         sequenceNumber: sequenceNumber ?? this.sequenceNumber,
         createdAt: createdAt ?? this.createdAt,
+        firestoreId: firestoreId.present ? firestoreId.value : this.firestoreId,
+        syncStatus: syncStatus ?? this.syncStatus,
+        lastSyncedAt:
+            lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
+        updatedAt: updatedAt ?? this.updatedAt,
       );
   ChatMessage copyWithCompanion(ChatMessagesCompanion data) {
     return ChatMessage(
@@ -2271,6 +2815,14 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
           ? data.sequenceNumber.value
           : this.sequenceNumber,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      firestoreId:
+          data.firestoreId.present ? data.firestoreId.value : this.firestoreId,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -2283,14 +2835,28 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
           ..write('sender: $sender, ')
           ..write('mentionItems: $mentionItems, ')
           ..write('sequenceNumber: $sequenceNumber, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('firestoreId: $firestoreId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, chatHistoryId, content, sender,
-      mentionItems, sequenceNumber, createdAt);
+  int get hashCode => Object.hash(
+      id,
+      chatHistoryId,
+      content,
+      sender,
+      mentionItems,
+      sequenceNumber,
+      createdAt,
+      firestoreId,
+      syncStatus,
+      lastSyncedAt,
+      updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2301,7 +2867,11 @@ class ChatMessage extends DataClass implements Insertable<ChatMessage> {
           other.sender == this.sender &&
           other.mentionItems == this.mentionItems &&
           other.sequenceNumber == this.sequenceNumber &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.firestoreId == this.firestoreId &&
+          other.syncStatus == this.syncStatus &&
+          other.lastSyncedAt == this.lastSyncedAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
@@ -2312,6 +2882,10 @@ class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
   final Value<String?> mentionItems;
   final Value<int> sequenceNumber;
   final Value<DateTime> createdAt;
+  final Value<String?> firestoreId;
+  final Value<String> syncStatus;
+  final Value<DateTime?> lastSyncedAt;
+  final Value<DateTime> updatedAt;
   const ChatMessagesCompanion({
     this.id = const Value.absent(),
     this.chatHistoryId = const Value.absent(),
@@ -2320,6 +2894,10 @@ class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
     this.mentionItems = const Value.absent(),
     this.sequenceNumber = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.firestoreId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
   });
   ChatMessagesCompanion.insert({
     this.id = const Value.absent(),
@@ -2329,6 +2907,10 @@ class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
     this.mentionItems = const Value.absent(),
     required int sequenceNumber,
     this.createdAt = const Value.absent(),
+    this.firestoreId = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
   })  : chatHistoryId = Value(chatHistoryId),
         content = Value(content),
         sender = Value(sender),
@@ -2341,6 +2923,10 @@ class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
     Expression<String>? mentionItems,
     Expression<int>? sequenceNumber,
     Expression<DateTime>? createdAt,
+    Expression<String>? firestoreId,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? lastSyncedAt,
+    Expression<DateTime>? updatedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2350,6 +2936,10 @@ class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
       if (mentionItems != null) 'mention_items': mentionItems,
       if (sequenceNumber != null) 'sequence_number': sequenceNumber,
       if (createdAt != null) 'created_at': createdAt,
+      if (firestoreId != null) 'firestore_id': firestoreId,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
     });
   }
 
@@ -2360,7 +2950,11 @@ class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
       Value<String>? sender,
       Value<String?>? mentionItems,
       Value<int>? sequenceNumber,
-      Value<DateTime>? createdAt}) {
+      Value<DateTime>? createdAt,
+      Value<String?>? firestoreId,
+      Value<String>? syncStatus,
+      Value<DateTime?>? lastSyncedAt,
+      Value<DateTime>? updatedAt}) {
     return ChatMessagesCompanion(
       id: id ?? this.id,
       chatHistoryId: chatHistoryId ?? this.chatHistoryId,
@@ -2369,6 +2963,10 @@ class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
       mentionItems: mentionItems ?? this.mentionItems,
       sequenceNumber: sequenceNumber ?? this.sequenceNumber,
       createdAt: createdAt ?? this.createdAt,
+      firestoreId: firestoreId ?? this.firestoreId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -2396,6 +2994,18 @@ class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (firestoreId.present) {
+      map['firestore_id'] = Variable<String>(firestoreId.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     return map;
   }
 
@@ -2408,7 +3018,11 @@ class ChatMessagesCompanion extends UpdateCompanion<ChatMessage> {
           ..write('sender: $sender, ')
           ..write('mentionItems: $mentionItems, ')
           ..write('sequenceNumber: $sequenceNumber, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('firestoreId: $firestoreId, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastSyncedAt: $lastSyncedAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -2455,6 +3069,9 @@ typedef $$NotesTableCreateCompanionBuilder = NotesCompanion Function({
   Value<bool> thumbnailMode,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<String?> firestoreId,
+  Value<String> syncStatus,
+  Value<DateTime?> lastSyncedAt,
 });
 typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
   Value<int> id,
@@ -2468,6 +3085,9 @@ typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
   Value<bool> thumbnailMode,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<String?> firestoreId,
+  Value<String> syncStatus,
+  Value<DateTime?> lastSyncedAt,
 });
 
 final class $$NotesTableReferences
@@ -2558,6 +3178,15 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt, builder: (column) => ColumnFilters(column));
 
   Expression<bool> noteTagsRefs(
       Expression<bool> Function($$NoteTagsTableFilterComposer f) f) {
@@ -2666,6 +3295,16 @@ class $$NotesTableOrderingComposer
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$NotesTableAnnotationComposer
@@ -2709,6 +3348,15 @@ class $$NotesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt, builder: (column) => column);
 
   Expression<T> noteTagsRefs<T extends Object>(
       Expression<T> Function($$NoteTagsTableAnnotationComposer a) f) {
@@ -2809,6 +3457,9 @@ class $$NotesTableTableManager extends RootTableManager<
             Value<bool> thumbnailMode = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<String?> firestoreId = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime?> lastSyncedAt = const Value.absent(),
           }) =>
               NotesCompanion(
             id: id,
@@ -2822,6 +3473,9 @@ class $$NotesTableTableManager extends RootTableManager<
             thumbnailMode: thumbnailMode,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            firestoreId: firestoreId,
+            syncStatus: syncStatus,
+            lastSyncedAt: lastSyncedAt,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -2835,6 +3489,9 @@ class $$NotesTableTableManager extends RootTableManager<
             Value<bool> thumbnailMode = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<String?> firestoreId = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime?> lastSyncedAt = const Value.absent(),
           }) =>
               NotesCompanion.insert(
             id: id,
@@ -2848,6 +3505,9 @@ class $$NotesTableTableManager extends RootTableManager<
             thumbnailMode: thumbnailMode,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            firestoreId: firestoreId,
+            syncStatus: syncStatus,
+            lastSyncedAt: lastSyncedAt,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
@@ -2925,10 +3585,18 @@ typedef $$NotesTableProcessedTableManager = ProcessedTableManager<
 typedef $$TagsTableCreateCompanionBuilder = TagsCompanion Function({
   Value<int> id,
   required String name,
+  Value<String?> firestoreId,
+  Value<String> syncStatus,
+  Value<DateTime?> lastSyncedAt,
+  Value<DateTime> updatedAt,
 });
 typedef $$TagsTableUpdateCompanionBuilder = TagsCompanion Function({
   Value<int> id,
   Value<String> name,
+  Value<String?> firestoreId,
+  Value<String> syncStatus,
+  Value<DateTime?> lastSyncedAt,
+  Value<DateTime> updatedAt,
 });
 
 final class $$TagsTableReferences
@@ -2963,6 +3631,18 @@ class $$TagsTableFilterComposer extends Composer<_$AppDatabase, $TagsTable> {
 
   ColumnFilters<String> get name => $composableBuilder(
       column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 
   Expression<bool> noteTagsRefs(
       Expression<bool> Function($$NoteTagsTableFilterComposer f) f) {
@@ -2999,6 +3679,19 @@ class $$TagsTableOrderingComposer extends Composer<_$AppDatabase, $TagsTable> {
 
   ColumnOrderings<String> get name => $composableBuilder(
       column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 }
 
 class $$TagsTableAnnotationComposer
@@ -3015,6 +3708,18 @@ class $$TagsTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   Expression<T> noteTagsRefs<T extends Object>(
       Expression<T> Function($$NoteTagsTableAnnotationComposer a) f) {
@@ -3063,18 +3768,34 @@ class $$TagsTableTableManager extends RootTableManager<
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
             Value<String> name = const Value.absent(),
+            Value<String?> firestoreId = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime?> lastSyncedAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
           }) =>
               TagsCompanion(
             id: id,
             name: name,
+            firestoreId: firestoreId,
+            syncStatus: syncStatus,
+            lastSyncedAt: lastSyncedAt,
+            updatedAt: updatedAt,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
             required String name,
+            Value<String?> firestoreId = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime?> lastSyncedAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
           }) =>
               TagsCompanion.insert(
             id: id,
             name: name,
+            firestoreId: firestoreId,
+            syncStatus: syncStatus,
+            lastSyncedAt: lastSyncedAt,
+            updatedAt: updatedAt,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
@@ -4072,6 +4793,9 @@ typedef $$ChatHistoriesTableCreateCompanionBuilder = ChatHistoriesCompanion
   Value<int> messageCount,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<String?> firestoreId,
+  Value<String> syncStatus,
+  Value<DateTime?> lastSyncedAt,
 });
 typedef $$ChatHistoriesTableUpdateCompanionBuilder = ChatHistoriesCompanion
     Function({
@@ -4081,6 +4805,9 @@ typedef $$ChatHistoriesTableUpdateCompanionBuilder = ChatHistoriesCompanion
   Value<int> messageCount,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<String?> firestoreId,
+  Value<String> syncStatus,
+  Value<DateTime?> lastSyncedAt,
 });
 
 final class $$ChatHistoriesTableReferences
@@ -4131,6 +4858,15 @@ class $$ChatHistoriesTableFilterComposer
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt, builder: (column) => ColumnFilters(column));
+
   Expression<bool> chatMessagesRefs(
       Expression<bool> Function($$ChatMessagesTableFilterComposer f) f) {
     final $$ChatMessagesTableFilterComposer composer = $composerBuilder(
@@ -4180,6 +4916,16 @@ class $$ChatHistoriesTableOrderingComposer
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$ChatHistoriesTableAnnotationComposer
@@ -4208,6 +4954,15 @@ class $$ChatHistoriesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt, builder: (column) => column);
 
   Expression<T> chatMessagesRefs<T extends Object>(
       Expression<T> Function($$ChatMessagesTableAnnotationComposer a) f) {
@@ -4260,6 +5015,9 @@ class $$ChatHistoriesTableTableManager extends RootTableManager<
             Value<int> messageCount = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<String?> firestoreId = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime?> lastSyncedAt = const Value.absent(),
           }) =>
               ChatHistoriesCompanion(
             id: id,
@@ -4268,6 +5026,9 @@ class $$ChatHistoriesTableTableManager extends RootTableManager<
             messageCount: messageCount,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            firestoreId: firestoreId,
+            syncStatus: syncStatus,
+            lastSyncedAt: lastSyncedAt,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -4276,6 +5037,9 @@ class $$ChatHistoriesTableTableManager extends RootTableManager<
             Value<int> messageCount = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<String?> firestoreId = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime?> lastSyncedAt = const Value.absent(),
           }) =>
               ChatHistoriesCompanion.insert(
             id: id,
@@ -4284,6 +5048,9 @@ class $$ChatHistoriesTableTableManager extends RootTableManager<
             messageCount: messageCount,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            firestoreId: firestoreId,
+            syncStatus: syncStatus,
+            lastSyncedAt: lastSyncedAt,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (
@@ -4339,6 +5106,10 @@ typedef $$ChatMessagesTableCreateCompanionBuilder = ChatMessagesCompanion
   Value<String?> mentionItems,
   required int sequenceNumber,
   Value<DateTime> createdAt,
+  Value<String?> firestoreId,
+  Value<String> syncStatus,
+  Value<DateTime?> lastSyncedAt,
+  Value<DateTime> updatedAt,
 });
 typedef $$ChatMessagesTableUpdateCompanionBuilder = ChatMessagesCompanion
     Function({
@@ -4349,6 +5120,10 @@ typedef $$ChatMessagesTableUpdateCompanionBuilder = ChatMessagesCompanion
   Value<String?> mentionItems,
   Value<int> sequenceNumber,
   Value<DateTime> createdAt,
+  Value<String?> firestoreId,
+  Value<String> syncStatus,
+  Value<DateTime?> lastSyncedAt,
+  Value<DateTime> updatedAt,
 });
 
 final class $$ChatMessagesTableReferences
@@ -4398,6 +5173,18 @@ class $$ChatMessagesTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 
   $$ChatHistoriesTableFilterComposer get chatHistoryId {
     final $$ChatHistoriesTableFilterComposer composer = $composerBuilder(
@@ -4449,6 +5236,19 @@ class $$ChatMessagesTableOrderingComposer
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
   $$ChatHistoriesTableOrderingComposer get chatHistoryId {
     final $$ChatHistoriesTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -4496,6 +5296,18 @@ class $$ChatMessagesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get firestoreId => $composableBuilder(
+      column: $table.firestoreId, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSyncedAt => $composableBuilder(
+      column: $table.lastSyncedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   $$ChatHistoriesTableAnnotationComposer get chatHistoryId {
     final $$ChatHistoriesTableAnnotationComposer composer = $composerBuilder(
@@ -4548,6 +5360,10 @@ class $$ChatMessagesTableTableManager extends RootTableManager<
             Value<String?> mentionItems = const Value.absent(),
             Value<int> sequenceNumber = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<String?> firestoreId = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime?> lastSyncedAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
           }) =>
               ChatMessagesCompanion(
             id: id,
@@ -4557,6 +5373,10 @@ class $$ChatMessagesTableTableManager extends RootTableManager<
             mentionItems: mentionItems,
             sequenceNumber: sequenceNumber,
             createdAt: createdAt,
+            firestoreId: firestoreId,
+            syncStatus: syncStatus,
+            lastSyncedAt: lastSyncedAt,
+            updatedAt: updatedAt,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -4566,6 +5386,10 @@ class $$ChatMessagesTableTableManager extends RootTableManager<
             Value<String?> mentionItems = const Value.absent(),
             required int sequenceNumber,
             Value<DateTime> createdAt = const Value.absent(),
+            Value<String?> firestoreId = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime?> lastSyncedAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
           }) =>
               ChatMessagesCompanion.insert(
             id: id,
@@ -4575,6 +5399,10 @@ class $$ChatMessagesTableTableManager extends RootTableManager<
             mentionItems: mentionItems,
             sequenceNumber: sequenceNumber,
             createdAt: createdAt,
+            firestoreId: firestoreId,
+            syncStatus: syncStatus,
+            lastSyncedAt: lastSyncedAt,
+            updatedAt: updatedAt,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (

@@ -13,6 +13,8 @@ import 'package:record_app/features/tags/presentation/bloc/tag_list_bloc.dart';
 import 'package:record_app/features/main_shell/presentation/bloc/main_shell_cubit.dart';
 import 'package:record_app/data/database/connection/native.dart' show closeDatabase;
 import 'package:record_app/core/utils/search_service.dart';
+import 'package:record_app/core/services/sync_service.dart'; // 导入同步服务
+import 'package:cloud_firestore/cloud_firestore.dart'; // 导入Firestore
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -33,6 +35,7 @@ late final AppDatabase _database;
 late final NotesRepository _notesRepository;
 late final TagsRepository _tagsRepository;
 late final ChatHistoryRepository _chatHistoryRepository;
+late final SyncService _syncService; // 添加同步服务实例
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +53,9 @@ void main() async {
   // 启动后台数据库维护
   _scheduleDatabaseMaintenance();
   
+  // 初始化同步服务并开始同步
+  await _initializeSyncService();
+  
   // 启动应用
   runApp(const App());
 }
@@ -63,6 +69,36 @@ Future<void> _initializeDependencies() async {
   _notesRepository = NotesRepository(_database);
   _tagsRepository = TagsRepository(_database);
   _chatHistoryRepository = ChatHistoryRepository(_database);
+}
+
+/// 初始化同步服务
+Future<void> _initializeSyncService() async {
+  try {
+    final firestore = FirebaseFirestore.instance;
+    _syncService = SyncService(
+      firestore: firestore,
+      notesRepository: _notesRepository,
+      tagsRepository: _tagsRepository,
+      chatHistoryRepository: _chatHistoryRepository,
+      database: _database,
+    );
+    
+    // 先修复笔记的同步状态
+    debugPrint('修复笔记同步状态...');
+    final fixedCount = await _notesRepository.fixNoteSyncStatus();
+    debugPrint('已修复 $fixedCount 个笔记的同步状态');
+
+    // 执行同步
+    debugPrint('初始化同步服务，开始同步数据...');
+    await _syncService.performFullSync();
+    
+    // 启动周期性同步（每5分钟执行一次）
+    _syncService.startPeriodicSync(interval: const Duration(minutes: 5));
+    
+    debugPrint('数据同步完成，已启动周期性同步');
+  } catch (e) {
+    debugPrint('初始化同步服务失败: $e');
+  }
 }
 
 /// 在UI渲染后安排数据库维护任务
@@ -104,7 +140,10 @@ Future<void> _ensureChatHistoryTables() async {
       last_message TEXT,
       message_count INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      firestore_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
+      last_synced_at DATETIME
     )
     ''');
     
@@ -118,6 +157,10 @@ Future<void> _ensureChatHistoryTables() async {
       mention_items TEXT,
       sequence_number INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      firestore_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
+      last_synced_at DATETIME,
       FOREIGN KEY (chat_history_id) REFERENCES chat_histories (id)
     )
     ''');
@@ -202,6 +245,11 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         // 搜索服务
         RepositoryProvider<SearchService>(
           create: (context) => SearchService(),
+          lazy: false,
+        ),
+        // 同步服务
+        RepositoryProvider<SyncService>(
+          create: (context) => _syncService,
           lazy: false,
         ),
       ],

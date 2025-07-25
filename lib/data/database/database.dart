@@ -4,6 +4,18 @@ part 'dao/note_dao.dart';
 part 'dao/tag_dao.dart';
 part 'database.g.dart';
 
+/// 同步状态枚举
+enum SyncStatus {
+  /// 已同步
+  synced,
+  /// 待上传
+  pending,
+  /// 需更新
+  dirty,
+  /// 待删除（本地删除，需在云端删除）
+  pendingDelete,
+}
+
 // --- 表定义 ---
 @DataClassName('Note')
 class Notes extends Table {
@@ -19,12 +31,24 @@ class Notes extends Table {
   BoolColumn get thumbnailMode => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now())();
   DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now())();
+  
+  // 同步字段
+  TextColumn get firestoreId => text().nullable()();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
+  DateTimeColumn get lastSyncedAt => dateTime().nullable()();
 }
 
 @DataClassName('Tag')
 class Tags extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().withLength(min: 1, max: 50)();
+  
+  // 同步字段
+  TextColumn get firestoreId => text().nullable()();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
+  DateTimeColumn get lastSyncedAt => dateTime().nullable()();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now())();
+  
   @override
   List<Set<Column>> get uniqueKeys => [ {name} ];
 }
@@ -83,6 +107,11 @@ class ChatHistories extends Table {
   // 创建和更新时间
   DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now())();
   DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now())();
+  
+  // 同步字段
+  TextColumn get firestoreId => text().nullable()();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
+  DateTimeColumn get lastSyncedAt => dateTime().nullable()();
 }
 
 // 【新增】用于存储聊天消息
@@ -101,6 +130,12 @@ class ChatMessages extends Table {
   IntColumn get sequenceNumber => integer()();
   // 创建时间
   DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now())();
+  
+  // 同步字段
+  TextColumn get firestoreId => text().nullable()();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
+  DateTimeColumn get lastSyncedAt => dateTime().nullable()();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now())();
 }
 
 // --- 数据类 ---
@@ -134,9 +169,9 @@ class ChatHistoryWithMessages {
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
-  // 【修改】schemaVersion 从 10 变为 11，添加聊天历史相关表
+  // 【修改】schemaVersion 从 11 变为 12，添加同步相关字段
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration {
@@ -167,7 +202,7 @@ class AppDatabase extends _$AppDatabase {
         }
         // 【新增】从版本 7 升级到 8 的逻辑：给 notes 加 thumbnail_mode 字段
         if (from < 8) {
-          await m.addColumn(notes, notes.thumbnailMode as GeneratedColumn<Object>);
+          await m.addColumn(notes, notes.thumbnailMode);
         }
         // 【新增】从版本 8 升级到 9 的逻辑：添加最近提及表
         if (from < 9) {
@@ -183,6 +218,36 @@ class AppDatabase extends _$AppDatabase {
         if (from < 11) {
           await m.createTable(chatHistories);
           await m.createTable(chatMessages);
+        }
+        // 【新增】从版本 11 升级到 12 的逻辑：添加同步相关字段
+        if (from < 12) {
+          // 为Notes表添加同步字段
+          await m.addColumn(notes, notes.firestoreId as GeneratedColumn<Object>);
+          await m.addColumn(notes, notes.syncStatus as GeneratedColumn<Object>);
+          await m.addColumn(notes, notes.lastSyncedAt as GeneratedColumn<Object>);
+          
+          // 为Tags表添加同步字段
+          await m.addColumn(tags, tags.firestoreId as GeneratedColumn<Object>);
+          await m.addColumn(tags, tags.syncStatus as GeneratedColumn<Object>);
+          await m.addColumn(tags, tags.lastSyncedAt as GeneratedColumn<Object>);
+          await m.addColumn(tags, tags.updatedAt as GeneratedColumn<Object>);
+          
+          // 为ChatHistories表添加同步字段
+          await m.addColumn(chatHistories, chatHistories.firestoreId as GeneratedColumn<Object>);
+          await m.addColumn(chatHistories, chatHistories.syncStatus as GeneratedColumn<Object>);
+          await m.addColumn(chatHistories, chatHistories.lastSyncedAt as GeneratedColumn<Object>);
+          
+          // 为ChatMessages表添加同步字段
+          await m.addColumn(chatMessages, chatMessages.firestoreId as GeneratedColumn<Object>);
+          await m.addColumn(chatMessages, chatMessages.syncStatus as GeneratedColumn<Object>);
+          await m.addColumn(chatMessages, chatMessages.lastSyncedAt as GeneratedColumn<Object>);
+          await m.addColumn(chatMessages, chatMessages.updatedAt as GeneratedColumn<Object>);
+          
+          // 初始化tags.updatedAt字段
+          await customStatement('UPDATE tags SET updated_at = CURRENT_TIMESTAMP');
+          
+          // 初始化chatMessages.updatedAt字段
+          await customStatement('UPDATE chat_messages SET updated_at = created_at');
         }
       },
     );
@@ -253,5 +318,110 @@ class AppDatabase extends _$AppDatabase {
     final history = await getChatHistoryById(historyId);
     final messages = await getChatMessagesByHistoryId(historyId);
     return ChatHistoryWithMessages(chatHistory: history, messages: messages);
+  }
+  
+  // 【新增】获取需要同步的笔记
+  Future<List<Note>> getNotesForSync() {
+    return (select(notes)
+      ..where((n) => n.syncStatus.equals('pending') | 
+                     n.syncStatus.equals('dirty') |
+                     n.syncStatus.equals('pendingDelete')))
+      .get();
+  }
+  
+  // 【新增】获取需要同步的标签
+  Future<List<Tag>> getTagsForSync() {
+    return (select(tags)
+      ..where((t) => t.syncStatus.equals('pending') | 
+                     t.syncStatus.equals('dirty')))
+      .get();
+  }
+  
+  // 【新增】获取需要同步的聊天历史
+  Future<List<ChatHistory>> getChatHistoriesForSync() {
+    return (select(chatHistories)
+      ..where((h) => h.syncStatus.equals('pending') | 
+                     h.syncStatus.equals('dirty')))
+      .get();
+  }
+  
+  // 【新增】获取需要同步的聊天消息
+  Future<List<ChatMessage>> getChatMessagesForSync() {
+    return (select(chatMessages)
+      ..where((m) => m.syncStatus.equals('pending') | 
+                     m.syncStatus.equals('dirty')))
+      .get();
+  }
+  
+  // 【新增】更新同步状态
+  Future<void> updateSyncStatus(int id, String tableName, String status, String? firestoreId) async {
+    final now = DateTime.now();
+    
+    switch (tableName) {
+      case 'notes':
+        await (update(notes)..where((n) => n.id.equals(id)))
+          .write(NotesCompanion(
+            syncStatus: Value(status),
+            lastSyncedAt: Value(now),
+            firestoreId: firestoreId != null ? Value(firestoreId) : const Value.absent(),
+          ));
+        break;
+      case 'tags':
+        await (update(tags)..where((t) => t.id.equals(id)))
+          .write(TagsCompanion(
+            syncStatus: Value(status),
+            lastSyncedAt: Value(now),
+            firestoreId: firestoreId != null ? Value(firestoreId) : const Value.absent(),
+          ));
+        break;
+      case 'chat_histories':
+        await (update(chatHistories)..where((h) => h.id.equals(id)))
+          .write(ChatHistoriesCompanion(
+            syncStatus: Value(status),
+            lastSyncedAt: Value(now),
+            firestoreId: firestoreId != null ? Value(firestoreId) : const Value.absent(),
+          ));
+        break;
+      case 'chat_messages':
+        await (update(chatMessages)..where((m) => m.id.equals(id)))
+          .write(ChatMessagesCompanion(
+            syncStatus: Value(status),
+            lastSyncedAt: Value(now),
+            firestoreId: firestoreId != null ? Value(firestoreId) : const Value.absent(),
+          ));
+        break;
+    }
+  }
+  
+  // 【新增】获取SyncStatus枚举值对应的字符串
+  String getSyncStatusString(SyncStatus status) {
+    switch (status) {
+      case SyncStatus.synced:
+        return 'synced';
+      case SyncStatus.pending:
+        return 'pending';
+      case SyncStatus.dirty:
+        return 'dirty';
+      case SyncStatus.pendingDelete:
+        return 'pendingDelete';
+      default:
+        return 'pending';
+    }
+  }
+  
+  // 【新增】从字符串获取SyncStatus枚举值
+  SyncStatus getSyncStatusFromString(String status) {
+    switch (status) {
+      case 'synced':
+        return SyncStatus.synced;
+      case 'pending':
+        return SyncStatus.pending;
+      case 'dirty':
+        return SyncStatus.dirty;
+      case 'pendingDelete':
+        return SyncStatus.pendingDelete;
+      default:
+        return SyncStatus.pending;
+    }
   }
 }

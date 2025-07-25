@@ -17,6 +17,7 @@ import 'package:record_app/features/tags/presentation/pages/tag_detail_page.dart
 import 'package:record_app/core/widgets/interactive_text.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:record_app/core/services/sync_service.dart'; // 导入SyncService
 
 
 import 'package:record_app/features/note_detail/presentation/widgets/note_edit_actions_bar.dart';
@@ -34,6 +35,7 @@ class NoteDetailPage extends StatelessWidget {
       create: (context) => NoteDetailBloc(
         notesRepository: context.read<NotesRepository>(),
         tagsRepository: context.read<TagsRepository>(),
+        syncService: context.read<SyncService>(), // 注入SyncService
       )..add(NoteDetailLoadNote(note.id)),
       child: NoteDetailView(initialNote: note),
     );
@@ -200,7 +202,12 @@ class _NoteDetailViewState extends State<NoteDetailView> {
       // 查找与该名称匹配的标签
       final tag = currentState.tags.firstWhere(
         (t) => t.name == tagName,
-        orElse: () => Tag(id: -1, name: ''),
+        orElse: () => Tag(
+          id: -1, 
+          name: '',
+          syncStatus: 'pending',
+          updatedAt: DateTime.now(),
+        ),
       );
       
       if (tag.id != -1) {

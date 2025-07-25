@@ -4,12 +4,13 @@ import 'package:dash_chat_2/dash_chat_2.dart' as dash;
 import 'package:record_app/data/database/database.dart';
 import 'package:record_app/data/models/chat_reference.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:record_app/data/database/connection/connection.dart' as connection;
 
 /// 聊天历史存储库
 class ChatHistoryRepository {
   final AppDatabase _database;
   
-  ChatHistoryRepository(this._database);
+  ChatHistoryRepository([AppDatabase? database]) : _database = database ?? connection.connect();
   
   /// 获取所有聊天历史
   Future<List<ChatHistory>> getAllChatHistories() {
@@ -28,6 +29,7 @@ class ChatHistoryRepository {
         title: title,
         createdAt: Value(DateTime.now()),
         updatedAt: Value(DateTime.now()),
+        syncStatus: const Value('pending'), // 新的聊天历史标记为待同步
       ),
     );
   }
@@ -53,6 +55,7 @@ class ChatHistoryRepository {
             : lastMessage),
         messageCount: Value(messageCount),
         updatedAt: Value(DateTime.now()),
+        syncStatus: const Value('dirty'), // 更新后标记为已修改
       ),
     );
   }
@@ -77,12 +80,15 @@ class ChatHistoryRepository {
     // 使用事务来确保数据完整性和性能
     return await _database.transaction(() async {
       try {
-        // 1. 创建聊天历史记录
+        final now = DateTime.now();
+        
+        // 1. 创建聊天历史记录，标记为待同步
         final historyId = await _database.createChatHistory(
           ChatHistoriesCompanion.insert(
             title: title, // 确保title有值
-            createdAt: Value(DateTime.now()),
-            updatedAt: Value(DateTime.now()),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+            syncStatus: const Value('pending'), // 新创建标记为待同步
           ),
         );
         
@@ -112,6 +118,7 @@ class ChatHistoryRepository {
               mentionItems: Value(mentionItemsJson),
               sequenceNumber: i,
               createdAt: Value(message.createdAt),
+              syncStatus: const Value('pending'), // 新消息标记为待同步
             ),
           );
         }
@@ -131,7 +138,8 @@ class ChatHistoryRepository {
                 ? '${lastMessage.text.substring(0, 47)}...' 
                 : lastMessage.text),
             messageCount: Value(messages.length),
-            updatedAt: Value(DateTime.now()),
+            updatedAt: Value(now),
+            syncStatus: const Value('pending'), // 保持为待同步状态
           ),
         );
         
@@ -156,6 +164,7 @@ class ChatHistoryRepository {
         final messages = await _database.getChatMessagesByHistoryId(historyId);
         final historyWithMessages = await _database.getChatHistoryWithMessages(historyId);
         final existingTitle = historyWithMessages.chatHistory.title;
+        final now = DateTime.now();
         
         // 如果没有提供序列号，则使用自动计算的值
         final actualSequenceNumber = sequenceNumber ?? (messages.isNotEmpty 
@@ -183,10 +192,12 @@ class ChatHistoryRepository {
             mentionItems: Value(mentionItemsJson),
             sequenceNumber: actualSequenceNumber,
             createdAt: Value(message.createdAt),
+            updatedAt: Value(now),
+            syncStatus: const Value('pending'), // 新消息标记为待同步
           ),
         );
         
-        // 3. 更新历史记录，确保包含title字段
+        // 3. 更新历史记录，确保包含title字段，并将状态标记为dirty
         await _database.updateChatHistory(
           ChatHistoriesCompanion(
             id: Value(historyId),
@@ -195,7 +206,8 @@ class ChatHistoryRepository {
                 ? '${message.text.substring(0, 47)}...' 
                 : message.text),
             messageCount: Value(messages.length + 1),
-            updatedAt: Value(DateTime.now()),
+            updatedAt: Value(now),
+            syncStatus: const Value('dirty'), // 更新后标记为已修改
           ),
         );
         
@@ -249,6 +261,27 @@ class ChatHistoryRepository {
   Future<void> deleteChatHistory(int historyId) async {
     return await _database.transaction(() async {
       try {
+        // 获取聊天历史记录
+        final history = await _database.getChatHistoryById(historyId);
+        
+        // 如果有Firestore ID，标记为删除而不是立即删除
+        if (history.firestoreId != null) {
+          await (_database.update(_database.chatHistories)..where((h) => h.id.equals(historyId)))
+            .write(const ChatHistoriesCompanion(
+              syncStatus: Value('pendingDelete'),
+            ));
+            
+          // 同时标记所有相关的消息为待删除
+          await (_database.update(_database.chatMessages)..where((m) => m.chatHistoryId.equals(historyId)))
+            .write(const ChatMessagesCompanion(
+              syncStatus: Value('pendingDelete'),
+            ));
+            
+          debugPrint('标记聊天历史为待删除: $historyId');
+          return;
+        }
+        
+        // 如果没有Firestore ID，直接删除本地记录
         // 首先删除与此历史记录相关的所有消息
         await _database.customStatement(
           'DELETE FROM chat_messages WHERE chat_history_id = ?',
