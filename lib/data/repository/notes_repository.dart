@@ -386,4 +386,67 @@ class NotesRepository {
     
     return fixedCount;
   }
+
+  /// 诊断工具：检查所有笔记的同步状态
+  Future<Map<String, int>> checkSyncStatusForAll() async {
+    final allNotes = await _database.noteDao.getAllNotes();
+    
+    // 统计各种同步状态的数量
+    final statusCounts = <String, int>{
+      'total': allNotes.length,
+      'pending': 0,
+      'dirty': 0,
+      'synced': 0,
+      'pendingDelete': 0,
+      'null': 0,
+      'other': 0,
+    };
+    
+    for (final note in allNotes) {
+      final status = note.syncStatus;
+      if (status == 'pending') {
+        statusCounts['pending'] = (statusCounts['pending'] ?? 0) + 1;
+      } else if (status == 'dirty') {
+        statusCounts['dirty'] = (statusCounts['dirty'] ?? 0) + 1;
+      } else if (status == 'synced') {
+        statusCounts['synced'] = (statusCounts['synced'] ?? 0) + 1;
+      } else if (status == 'pendingDelete') {
+        statusCounts['pendingDelete'] = (statusCounts['pendingDelete'] ?? 0) + 1;
+      } else if (status == null) {
+        statusCounts['null'] = (statusCounts['null'] ?? 0) + 1;
+      } else {
+        statusCounts['other'] = (statusCounts['other'] ?? 0) + 1;
+      }
+      
+      // 输出带有firestoreId但状态为dirty的笔记
+      if (status == 'dirty' && note.firestoreId != null) {
+        print('笔记ID ${note.id} 标题: "${note.title}" 状态: dirty, firestoreId: ${note.firestoreId}');
+      }
+      
+      // 输出状态为pending的笔记
+      if (status == 'pending') {
+        print('笔记ID ${note.id} 标题: "${note.title}" 状态: pending, firestoreId: ${note.firestoreId ?? "无"}');
+      }
+    }
+    
+    return statusCounts;
+  }
+  
+  /// 修复所有笔记的同步状态为pending
+  Future<int> resetAllNotesToPending() async {
+    final allNotes = await _database.noteDao.getAllNotes();
+    int count = 0;
+    
+    for (final note in allNotes) {
+      await _database.updateSyncStatus(
+        note.id,
+        'notes',
+        'pending',
+        null,
+      );
+      count++;
+    }
+    
+    return count;
+  }
 } 

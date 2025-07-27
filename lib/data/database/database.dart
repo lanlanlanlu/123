@@ -321,12 +321,24 @@ class AppDatabase extends _$AppDatabase {
   }
   
   // 【新增】获取需要同步的笔记
-  Future<List<Note>> getNotesForSync() {
-    return (select(notes)
-      ..where((n) => n.syncStatus.equals('pending') | 
-                     n.syncStatus.equals('dirty') |
-                     n.syncStatus.equals('pendingDelete')))
-      .get();
+  Future<List<Note>> getNotesForSync() async {
+    try {
+      final result = await (select(notes)
+        ..where((n) => n.syncStatus.equals('pending') | 
+                       n.syncStatus.equals('dirty') |
+                       n.syncStatus.equals('pendingDelete')))
+        .get();
+        
+      print('getNotesForSync查询到 ${result.length} 条笔记，其中: ' + 
+            'pending=${result.where((n) => n.syncStatus == 'pending').length}, ' +
+            'dirty=${result.where((n) => n.syncStatus == 'dirty').length}, ' +
+            'pendingDelete=${result.where((n) => n.syncStatus == 'pendingDelete').length}');
+            
+      return result;
+    } catch (e) {
+      print('getNotesForSync出错: $e');
+      return [];
+    }
   }
   
   // 【新增】获取需要同步的标签
