@@ -272,7 +272,7 @@ pydantic-core==2.33.2
     # via
     #   cohere
     #   pydantic
-pypdf==5.8.0
+pypdf==5.9.0
     # via llama-index-readers-file
 pystemmer==2.2.0.3
     # via llama-index-retrievers-bm25
@@ -309,7 +309,7 @@ requests==2.32.4
     #   tiktoken
 rsa==4.9.1
     # via google-auth
-scipy==1.16.0
+scipy==1.16.1
     # via bm25s
 six==1.17.0
     # via python-dateutil
