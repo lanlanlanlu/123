@@ -27,6 +27,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
 ENV PORT=8000
+ENV DB_PATH=./data/record.sqlite
 
 # 暴露端口
 EXPOSE 8000

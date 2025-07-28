@@ -20,6 +20,7 @@ from utils.date_utils import (
 # 数据库路径 - 尝试几种可能的路径
 DB_PATHS = [
     "D:\\am4yne\\Documents\\record.sqlite",  # 原始路径
+    "./data/record.sqlite",  # 服务器路径
 ]
 
 def find_database():

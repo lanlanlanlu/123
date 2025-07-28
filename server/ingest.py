@@ -31,8 +31,10 @@ import re
 
 # --- 配置 ---
 PERSIST_DIR = "./storage"
-# 【保持不变】数据库路径
-DB_PATH = "D:\\am4yne\\Documents\\record.sqlite" 
+# 【原始路径-本地测试用】
+# DB_PATH = "D:\\am4yne\\Documents\\record.sqlite" 
+# 【新路径-服务器使用】
+DB_PATH = "./data/record.sqlite"
 
 # --- 切分参数配置 ---
 CHUNK_SIZE = 1024  # 增加为1024，原来是512
