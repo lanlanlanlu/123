@@ -88,17 +88,10 @@ Future<void> _initializeSyncService() async {
     final syncStatus = await _notesRepository.checkSyncStatusForAll();
     debugPrint('笔记同步状态统计: $syncStatus');
     
-    // 如果没有pending状态的笔记，将所有笔记重置为pending状态
-    if ((syncStatus['pending'] ?? 0) == 0 && (syncStatus['total'] ?? 0) > 0) {
-      debugPrint('没有待上传的笔记，将所有笔记重置为pending状态...');
-      final resetCount = await _notesRepository.resetAllNotesToPending();
-      debugPrint('已重置 $resetCount 个笔记为pending状态');
-    } else {
-      // 修复有问题的笔记状态
-      debugPrint('修复笔记同步状态...');
-      final fixedCount = await _notesRepository.fixNoteSyncStatus();
-      debugPrint('已修复 $fixedCount 个笔记的同步状态');
-    }
+    // 仅修复有问题的笔记状态，不再盲目重置所有笔记为pending
+    debugPrint('修复笔记同步状态...');
+    final fixedCount = await _notesRepository.fixNoteSyncStatus();
+    debugPrint('已修复 $fixedCount 个笔记的同步状态');
 
     // 执行同步
     debugPrint('初始化同步服务，开始同步数据...');

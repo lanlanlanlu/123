@@ -131,7 +131,7 @@ class SyncService {
       final allDirtyNotes = await _database.getNotesForSync();
       final dirtyNotes = allDirtyNotes.where((note) => note.syncStatus == 'dirty').toList();
           
-      _logger.d('Found ${dirtyNotes.length} dirty notes to update');
+      _logger.d('找到 ${dirtyNotes.length} 条脏状态笔记需要更新');
       
       // 诊断输出所有脏笔记的状态
       for (final note in dirtyNotes) {
@@ -152,32 +152,65 @@ class SyncService {
           'thumbnailMode': note.thumbnailMode,
           'updatedAt': Timestamp.fromDate(note.updatedAt),
           'localId': note.id,
+          'createdAt': Timestamp.fromDate(note.createdAt),  // 确保创建时间也被保存
         };
         
-        // 如果笔记没有firestoreId，创建一个新文档
+        // 如果笔记没有firestoreId，检查Firestore中是否已有相同内容的笔记
         if (note.firestoreId == null) {
-          final docRef = await _firestore.collection('notes').add(noteData);
-          await _database.updateSyncStatus(
-            note.id, 
-            'notes', 
-            'synced',
-            docRef.id
-          );
-          _logger.d('Created new note in Firestore for local note ${note.id}, got ID: ${docRef.id}');
+          // 先查询是否有内容相同的笔记
+          final existingNoteQuery = await _firestore.collection('notes')
+              .where('localId', isEqualTo: note.id)
+              .get();
+              
+          if (existingNoteQuery.docs.isNotEmpty) {
+            // 发现相同localId的笔记，使用它的ID
+            final existingDoc = existingNoteQuery.docs.first;
+            await existingDoc.reference.update(noteData);
+            await _database.updateSyncStatus(
+              note.id, 
+              'notes', 
+              'synced',
+              existingDoc.id
+            );
+            _logger.d('找到并更新了已存在的云端笔记(localId ${note.id})，Firestore ID: ${existingDoc.id}');
+          } else {
+            // 未找到匹配的笔记，创建新文档
+            final docRef = await _firestore.collection('notes').add(noteData);
+            await _database.updateSyncStatus(
+              note.id, 
+              'notes', 
+              'synced',
+              docRef.id
+            );
+            _logger.d('为本地笔记 ${note.id} 在Firestore中创建了新文档，获得ID: ${docRef.id}');
+          }
         } else {
           // 更新已有的Firestore文档
-        await _firestore.collection('notes').doc(note.firestoreId).update(noteData);
-        await _database.updateSyncStatus(
-          note.id, 
-          'notes', 
-          'synced',
-          note.firestoreId
-        );
-        _logger.d('Updated note ${note.id} in Firestore (doc ID: ${note.firestoreId})');
+          try {
+            await _firestore.collection('notes').doc(note.firestoreId).update(noteData);
+            await _database.updateSyncStatus(
+              note.id, 
+              'notes', 
+              'synced',
+              note.firestoreId
+            );
+            _logger.d('在Firestore中更新了笔记 ${note.id} (文档ID: ${note.firestoreId})');
+          } catch (e) {
+            _logger.e('更新Firestore笔记失败: $e，尝试重新创建');
+            // 如果更新失败(可能文档已被删除)，创建一个新文档
+            final docRef = await _firestore.collection('notes').add(noteData);
+            await _database.updateSyncStatus(
+              note.id, 
+              'notes', 
+              'synced',
+              docRef.id
+            );
+            _logger.d('为本地笔记 ${note.id} 在Firestore中重新创建了文档，获得新ID: ${docRef.id}');
+          }
         }
       }
     } catch (e) {
-      _logger.e('Error updating dirty notes: $e');
+      _logger.e('更新脏状态笔记时出错: $e');
       rethrow;
     }
   }
@@ -190,22 +223,38 @@ class SyncService {
       final notesToDelete = allNotesToDelete.where((note) => 
           note.syncStatus == 'pendingDelete' && note.firestoreId != null).toList();
           
-      _logger.d('Found ${notesToDelete.length} notes to delete remotely');
+      _logger.d('找到 ${notesToDelete.length} 条笔记需要远程删除');
       
       // 遍历并删除每条笔记
       for (final note in notesToDelete) {
         if (note.firestoreId == null) continue; // 安全检查
         
-        // 从Firestore中删除
-        await _firestore.collection('notes').doc(note.firestoreId).delete();
-        
-        // 更新本地记录状态或完全删除
-        await _database.noteDao.softDeleteNote(note.id);
-        
-        _logger.d('Deleted note ${note.id} from Firestore (doc ID: ${note.firestoreId})');
+        try {
+          // 从Firestore中删除
+          await _firestore.collection('notes').doc(note.firestoreId).delete();
+          _logger.d('从Firestore中删除笔记 ${note.id} (文档ID: ${note.firestoreId})');
+        } catch (e) {
+          _logger.w('删除Firestore笔记时出错，可能文档已不存在: $e');
+          // 即使删除失败，也要继续更新本地状态
+        } finally {
+          // 无论远程删除是否成功，都要更新本地状态
+          // 同时将firestoreId设为null，防止将来再次尝试删除
+          await _database.updateSyncStatus(
+            note.id, 
+            'notes', 
+            'synced', 
+            null
+          );
+          
+          // 确保本地记录被标记为已删除
+          if (!note.isDeleted) {
+            await _database.noteDao.softDeleteNote(note.id);
+            _logger.d('已将笔记 ${note.id} 标记为本地删除');
+          }
+        }
       }
     } catch (e) {
-      _logger.e('Error deleting notes from cloud: $e');
+      _logger.e('从云端删除笔记时出错: $e');
       rethrow;
     }
   }
@@ -430,34 +479,81 @@ class SyncService {
 
   /// 启动监听远程数据变化的流程
   void startListeningForRemoteChanges() {
-    if (kIsWeb) {
-      _logger.d('Starting remote change listeners (web)');
-    } else {
-      _logger.d('Starting remote change listeners (native)');
+    try {
+      if (kIsWeb) {
+        _logger.d('启动远程变更监听器 (web)');
+      } else {
+        _logger.d('启动远程变更监听器 (native)');
+      }
+      
+      // 监听笔记变化
+      _listenForNoteChanges();
+      
+      // 监听标签变化
+      _listenForTagChanges();
+      
+      // 监听聊天历史变化
+      _listenForChatHistoryChanges();
+      
+      // 监听聊天消息变化
+      _listenForChatMessageChanges();
+      
+      _logger.d('所有远程监听器已启动');
+    } catch (e) {
+      _logger.e('启动远程监听器时出错: $e');
     }
-    
-    // 监听笔记变化
-    _listenForNoteChanges();
-    
-    // 监听标签变化
-    _listenForTagChanges();
-    
-    // 监听聊天历史变化
-    _listenForChatHistoryChanges();
-    
-    // 监听聊天消息变化
-    _listenForChatMessageChanges();
   }
+  
+  // 用于防止重复处理的集合
+  final Set<String> _processedChanges = {};
   
   /// 监听笔记集合的变化
   void _listenForNoteChanges() {
-    _firestore.collection('notes').snapshots().listen((snapshot) {
-      for (var change in snapshot.docChanges) {
-        _handleNoteChange(change);
-      }
-    }, onError: (e) {
-      _logger.e('Error listening for note changes: $e');
-    });
+    try {
+      _logger.d('开始监听笔记集合变化');
+      _firestore.collection('notes')
+        // 限制查询数量，避免处理太多变更
+        .limit(50)
+        .snapshots()
+        .listen((snapshot) {
+          _logger.d('收到笔记变更通知，共 ${snapshot.docChanges.length} 个变更');
+          
+          for (var change in snapshot.docChanges) {
+            // 创建一个唯一标识符，避免重复处理相同变更
+            final changeId = '${change.doc.id}_${change.type}_${DateTime.now().millisecondsSinceEpoch}';
+            
+            if (!_processedChanges.contains(changeId)) {
+              _processedChanges.add(changeId);
+              
+              // 使用异步方式处理，避免阻塞
+              Future.microtask(() async {
+                try {
+                  await _handleNoteChange(change);
+                } catch (e) {
+                  _logger.e('处理笔记变更时出错: $e');
+                } finally {
+                  // 处理完成后从集合中移除
+                  _processedChanges.remove(changeId);
+                }
+              });
+              
+              // 如果处理队列太长，清理旧的记录
+              if (_processedChanges.length > 100) {
+                _processedChanges.clear();
+                _logger.w('处理队列过长，已清空');
+              }
+            }
+          }
+        }, 
+        onError: (e) {
+          _logger.e('监听笔记变更时出错: $e');
+        },
+        onDone: () {
+          _logger.d('笔记变更监听器已关闭');
+        });
+    } catch (e) {
+      _logger.e('创建笔记监听器时出错: $e');
+    }
   }
   
   /// 处理笔记变更
@@ -491,22 +587,66 @@ class SyncService {
   
   /// 处理云端新增笔记
   Future<void> _handleRemoteNoteAdded(String firestoreId, Map<String, dynamic> noteData) async {
-    // 1. 检查此笔记是否已存在于本地
+    // 1. 检查此笔记是否已存在于本地 (通过firestoreId)
     final localNotes = await _database.noteDao.getAllNotes();
-    final existingNote = localNotes.where((note) => note.firestoreId == firestoreId).firstOrNull;
+    final existingNoteById = localNotes.where((note) => note.firestoreId == firestoreId).firstOrNull;
     
-    if (existingNote != null) {
+    if (existingNoteById != null) {
       // 已存在，无需处理
+      _logger.d('本地已存在此笔记 ID: ${existingNoteById.id}，Firestore ID: $firestoreId');
       return;
     }
     
-    // 2. 如果本地不存在，创建新笔记
+    // 2. 检查是否有内容相似的笔记 (通过标题和内容比较)
+    final title = noteData['title'] as String? ?? 'Untitled';
+    final content = noteData['content'] as String? ?? '';
+    
+    // 查找标题和内容都匹配的笔记
+    final similarNote = localNotes.where((note) => 
+      note.title == title && note.content == content).firstOrNull;
+      
+    if (similarNote != null) {
+      // 找到内容相似的笔记，更新它的firestoreId和状态，而不是创建新笔记
+      _logger.d('发现内容相似的本地笔记 ID: ${similarNote.id}，关联到Firestore ID: $firestoreId');
+      
+      await _database.updateSyncStatus(
+        similarNote.id, 
+        'notes', 
+        'synced', 
+        firestoreId
+      );
+      return;
+    }
+    
+    // 3. 检查是否有本地ID匹配的笔记
+    final localId = noteData['localId'] as int?;
+    if (localId != null) {
+      try {
+        final noteByLocalId = await _database.noteDao.getNoteById(localId);
+        _logger.d('通过localId找到本地笔记 ID: ${noteByLocalId.id}，关联到Firestore ID: $firestoreId');
+        
+        await _database.updateSyncStatus(
+          noteByLocalId.id, 
+          'notes', 
+          'synced', 
+          firestoreId
+        );
+        return;
+      } catch (e) {
+        // 找不到对应localId的笔记，继续创建新笔记
+        _logger.d('未找到localId为 $localId 的本地笔记: $e');
+      }
+    }
+    
+    // 4. 如果本地确实不存在，才创建新笔记
     final createdAt = (noteData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
     final updatedAt = (noteData['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now();
     
+    _logger.d('创建全新本地笔记，Firestore ID: $firestoreId，标题: "$title"');
+    
     final newNote = NotesCompanion.insert(
-      title: noteData['title'] as String? ?? 'Untitled',
-      content: noteData['content'] as String? ?? '',
+      title: title,
+      content: content,
       locationInfo: Value(noteData['locationInfo'] as String?),
       color: Value(noteData['color'] as int?),
       isPinned: Value(noteData['isPinned'] as bool? ?? false),
@@ -520,7 +660,7 @@ class SyncService {
     );
     
     await _database.noteDao.insertNote(newNote);
-    _logger.d('Added note from cloud, Firestore ID: $firestoreId');
+    _logger.d('已添加来自云端的笔记，Firestore ID: $firestoreId');
   }
   
   /// 处理云端修改笔记 - 不再自动更新本地数据，而是记录云端版本信息
