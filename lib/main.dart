@@ -82,7 +82,7 @@ Future<void> _initializeSyncService() async {
       chatHistoryRepository: _chatHistoryRepository,
       database: _database,
     );
-    
+
     // 输出同步状态诊断信息
     debugPrint('检查笔记同步状态...');
     final syncStatus = await _notesRepository.checkSyncStatusForAll();

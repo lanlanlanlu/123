@@ -38,6 +38,8 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
     on<NoteDetailRemoveTag>(_onRemoveTag);
     on<NoteDetailUpdateImages>(_onUpdateImages);
     on<NoteDetailToggleThumbnailMode>(_onToggleThumbnailMode);
+    on<NoteDetailCheckRemoteUpdate>(_onCheckRemoteUpdate);
+    on<NoteDetailApplyRemoteUpdate>(_onApplyRemoteUpdate);
     
     // 内部事件处理
     on<_NoteDetailUpdated>(_onNoteUpdated);
@@ -371,6 +373,65 @@ class NoteDetailBloc extends Bloc<NoteDetailEvent, NoteDetailState> {
       // 恢复之前的状态
       if (currentState is NoteDetailLoaded) {
         emit(currentState);
+      }
+    }
+  }
+
+  /// 检查笔记是否有远程更新
+  Future<void> _onCheckRemoteUpdate(NoteDetailCheckRemoteUpdate event, Emitter<NoteDetailState> emit) async {
+    if (_currentNoteId == null) return;
+
+    try {
+      // 检查是否有云端更新
+      final hasUpdate = _syncService.hasRemoteUpdate(_currentNoteId!);
+      
+      if (hasUpdate) {
+        final updateData = _syncService.getRemoteUpdateData(_currentNoteId!);
+        if (updateData != null) {
+          // 添加 hasRemoteUpdate 标志到状态
+          final currentState = state;
+          if (currentState is NoteDetailLoaded) {
+            final noteData = updateData['noteData'] as Map<String, dynamic>;
+            final remoteTitle = noteData['title'] as String?;
+            final remoteUpdatedAt = updateData['remoteUpdatedAt'] as DateTime?;
+            
+            emit(currentState.copyWith(
+              hasRemoteUpdate: true,
+              remoteTitle: remoteTitle ?? currentState.note.title,
+              remoteUpdatedAt: remoteUpdatedAt,
+            ));
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('检查远程更新失败: $e');
+    }
+  }
+
+  /// 应用远程更新到本地笔记
+  Future<void> _onApplyRemoteUpdate(NoteDetailApplyRemoteUpdate event, Emitter<NoteDetailState> emit) async {
+    if (_currentNoteId == null) return;
+
+    final currentState = state;
+    if (currentState is NoteDetailLoaded) {
+      try {
+        // 应用远程更新
+        await _syncService.applyRemoteUpdate(_currentNoteId!);
+        
+        // 重新加载笔记
+        final updatedNote = await _notesRepository.getNoteById(_currentNoteId!);
+        
+        // 更新状态
+        emit(currentState.copyWith(
+          note: updatedNote,
+          hasRemoteUpdate: false,
+          remoteTitle: null,
+          remoteUpdatedAt: null,
+          clearDraft: true, // 清除草稿内容，显示最新内容
+        ));
+      } catch (e) {
+        emit(NoteDetailLoadFailure('应用远程更新失败: ${e.toString()}'));
+        emit(currentState); // 恢复到之前的状态
       }
     }
   }

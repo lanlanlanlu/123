@@ -86,4 +86,20 @@ class NoteDetailUpdateImages extends NoteDetailEvent {
 /// 切换小图模式事件
 class NoteDetailToggleThumbnailMode extends NoteDetailEvent {
   const NoteDetailToggleThumbnailMode();
+}
+
+/// 检查并处理远程更新事件
+class NoteDetailCheckRemoteUpdate extends NoteDetailEvent {
+  const NoteDetailCheckRemoteUpdate();
+
+  @override
+  List<Object?> get props => [];
+}
+
+/// 应用远程更新事件
+class NoteDetailApplyRemoteUpdate extends NoteDetailEvent {
+  const NoteDetailApplyRemoteUpdate();
+
+  @override
+  List<Object?> get props => [];
 } 

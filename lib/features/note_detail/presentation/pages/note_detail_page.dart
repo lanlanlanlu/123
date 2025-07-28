@@ -24,6 +24,9 @@ import 'package:record_app/features/note_detail/presentation/widgets/note_edit_a
 import 'package:record_app/features/note_detail/presentation/widgets/note_utils.dart';
 // 导入Quill编辑器组件
 import 'package:record_app/features/note_detail/presentation/widgets/quill_editor_widget.dart';
+// 导入远程更新对话框
+import 'package:record_app/features/note_detail/presentation/widgets/remote_update_dialog.dart';
+import 'package:intl/intl.dart';
 
 class NoteDetailPage extends StatelessWidget {
   final Note note;
@@ -87,6 +90,11 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     
     // 添加文本控制器监听
     _textController.addListener(_onTextChanged);
+    
+    // 检查远程更新
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NoteDetailBloc>().add(const NoteDetailCheckRemoteUpdate());
+    });
   }
 
   @override
@@ -229,8 +237,10 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     return BlocConsumer<NoteDetailBloc, NoteDetailState>(
       listenWhen: (previous, current) {
         // 只有当状态从NoteDetailLoaded变为其他状态或操作成功时才响应
+        // 或者当存在远程更新时
         return (previous is NoteDetailLoaded && !(current is NoteDetailLoaded)) ||
-          current is NoteDetailOperationSuccess;
+          current is NoteDetailOperationSuccess ||
+          (current is NoteDetailLoaded && current.hasRemoteUpdate);
       },
       listener: (context, state) {
         if (state is NoteDetailOperationSuccess) {
@@ -241,6 +251,29 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.message)),
           );
+        } else if (state is NoteDetailLoaded && state.hasRemoteUpdate) {
+          // 检查是否有远程更新
+          if (state.remoteUpdatedAt != null && state.remoteTitle != null) {
+            final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+            final formattedDate = dateFormat.format(state.remoteUpdatedAt!);
+            
+            // 显示远程更新对话框
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              RemoteUpdateDialog.show(
+                context,
+                title: state.remoteTitle!,
+                remoteUpdatedTime: formattedDate,
+                onAccept: () {
+                  // 接受远程更新
+                  context.read<NoteDetailBloc>().add(const NoteDetailApplyRemoteUpdate());
+                },
+                onReject: () {
+                  // 拒绝远程更新，继续使用本地版本
+                  context.read<SyncService>().rejectRemoteUpdate(widget.initialNote.id);
+                },
+              );
+            });
+          }
         }
       },
       builder: (context, state) {

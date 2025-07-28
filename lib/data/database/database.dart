@@ -324,10 +324,10 @@ class AppDatabase extends _$AppDatabase {
   Future<List<Note>> getNotesForSync() async {
     try {
       final result = await (select(notes)
-        ..where((n) => n.syncStatus.equals('pending') | 
-                       n.syncStatus.equals('dirty') |
-                       n.syncStatus.equals('pendingDelete')))
-        .get();
+      ..where((n) => n.syncStatus.equals('pending') | 
+                     n.syncStatus.equals('dirty') |
+                     n.syncStatus.equals('pendingDelete')))
+      .get();
         
       print('getNotesForSync查询到 ${result.length} 条笔记，其中: ' + 
             'pending=${result.where((n) => n.syncStatus == 'pending').length}, ' +
