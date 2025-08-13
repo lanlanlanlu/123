@@ -2,6 +2,7 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:record_app/features/home/presentation/bloc/home_bloc.dart';
 import 'package:record_app/features/home/presentation/bloc/home_event.dart';
 import 'package:record_app/features/home/presentation/pages/location_list_page.dart';

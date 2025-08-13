@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../../../../data/repository/repository.dart';
 import '../widgets/calendar_widget.dart';
 import '../widgets/calendar_notes_list.dart';
@@ -55,6 +56,8 @@ class _TodayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocalizations.of(context)!;
+    
     return Container(
       width: 36,
       height: 36,

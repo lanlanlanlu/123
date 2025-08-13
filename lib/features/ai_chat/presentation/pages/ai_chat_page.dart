@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:dash_chat_2/dash_chat_2.dart' as dash;
 import '../bloc/ai_chat_bloc.dart';
 import '../bloc/ai_chat_event.dart';

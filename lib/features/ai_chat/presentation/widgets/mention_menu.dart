@@ -6,6 +6,7 @@ import 'package:record_app/data/repository/recent_mentions_repository.dart';
 import 'package:record_app/data/database/connection/connection.dart' as connection;
 import 'package:flutter/foundation.dart';
 import 'package:record_app/core/utils/search_service.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// 表示可在聊天中@的项目类型
 enum MentionType {
@@ -577,21 +578,23 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   
   // 根据当前模式获取搜索框的提示文字
   String _getSearchHintText() {
+    final s = AppLocalizations.of(context)!;
     switch (_currentMode) {
       case MenuMode.notes:
-        return '搜索笔记...';
+        return s.aiChatMentionSearchNotes;
       case MenuMode.tags:
-        return '搜索标签...';
+        return s.aiChatMentionSearchTags;
       case MenuMode.locations:
-        return '搜索地点...';
+        return s.aiChatMentionSearchLocations;
       case MenuMode.main:
       default:
-        return '添加笔记，地点，标签...';
+        return s.aiChatMentionSearchAll;
     }
   }
 
   // 构建主菜单内容
   Widget _buildMainMenuContent() {
+    final s = AppLocalizations.of(context)!;
     return Container(
       height: menuHeight,
       child: Column(
@@ -615,7 +618,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           // 常规选项
           _buildMenuOption(
             icon: Icons.note,
-            title: '笔记',
+            title: s.aiChatMentionNotes,
             onTap: () {
               // 切换到笔记列表模式
               _switchToNotesMode();
@@ -624,7 +627,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           _divider,
           _buildMenuOption(
             icon: Icons.label,
-            title: '标签',
+            title: s.aiChatMentionTags,
             onTap: () {
               // 切换到标签列表模式
               _switchToTagsMode();
@@ -633,7 +636,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           _divider,
           _buildMenuOption(
             icon: Icons.location_on,
-            title: '地点',
+            title: s.aiChatMentionLocations,
             onTap: () {
               // 切换到地点列表模式
               _switchToLocationsMode();
@@ -646,12 +649,13 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
 
   // 构建无最近提及项目的视图
   Widget _buildNoRecentMentionsView() {
+    final s = AppLocalizations.of(context)!;
     return SizedBox(
       height: 2 * itemHeight, // 两个项目的高度，不包括多余的分隔线
-      child: const Center(
+      child: Center(
         child: Text(
-          '无最近提及项目',
-          style: TextStyle(fontSize: 14, color: Colors.black54),
+          s.aiChatMentionNoRecentItems,
+          style: const TextStyle(fontSize: 14, color: Colors.black54),
         ),
       ),
     );
@@ -714,6 +718,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
 
   // 构建笔记列表内容
   Widget _buildNotesListContent() {
+    final s = AppLocalizations.of(context)!;
     if (_isLoading) {
       return SizedBox(
         height: menuHeight,
@@ -724,7 +729,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
     if (_notes.isEmpty) {
       return SizedBox(
         height: menuHeight,
-        child: const Center(child: Text('没有笔记', style: TextStyle(fontSize: 14, color: Colors.black54))),
+        child: Center(child: Text(s.aiChatMentionNoNotes, style: const TextStyle(fontSize: 14, color: Colors.black54))),
       );
     }
     
@@ -868,6 +873,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
 
   // 构建标签列表内容
   Widget _buildTagsListContent() {
+    final s = AppLocalizations.of(context)!;
     if (_isLoadingTags) {
       return SizedBox(
         height: menuHeight,
@@ -878,7 +884,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
     if (_tags.isEmpty) {
       return SizedBox(
         height: menuHeight,
-        child: const Center(child: Text('没有标签', style: TextStyle(fontSize: 14, color: Colors.black54))),
+        child: Center(child: Text(s.aiChatMentionNoTags, style: const TextStyle(fontSize: 14, color: Colors.black54))),
       );
     }
     
@@ -952,6 +958,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   
   // 构建地点列表内容
   Widget _buildLocationsListContent() {
+    final s = AppLocalizations.of(context)!;
     if (_isLoadingLocations) {
       return SizedBox(
         height: menuHeight,
@@ -962,7 +969,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
     if (_locations.isEmpty) {
       return SizedBox(
         height: menuHeight,
-        child: const Center(child: Text('没有地点', style: TextStyle(fontSize: 14, color: Colors.black54))),
+        child: Center(child: Text(s.aiChatMentionNoLocations, style: const TextStyle(fontSize: 14, color: Colors.black54))),
       );
     }
     
@@ -1036,6 +1043,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
 
   // 构建搜索结果内容
   Widget _buildSearchResultsContent() {
+    final s = AppLocalizations.of(context)!;
     if (_isSearching) {
       return SizedBox(
         height: menuHeight,
@@ -1046,10 +1054,10 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
     if (_searchResults.isEmpty) {
       return SizedBox(
         height: menuHeight,
-        child: const Center(
+        child: Center(
           child: Text(
-            '无搜索结果',
-            style: TextStyle(fontSize: 14, color: Colors.black54),
+            s.aiChatMentionNoSearchResults,
+            style: const TextStyle(fontSize: 14, color: Colors.black54),
           ),
         ),
       );

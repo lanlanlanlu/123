@@ -1,7 +1,7 @@
 {
   "@@locale": "zh",
   
-  "appTitle": "记录应用",
+  "appTitle": "笔记",
   
   "searchHint": "搜索笔记、标签、位置...",
   "searchNoResults": "未找到搜索结果",
@@ -117,7 +117,7 @@
   "statsChars": "字数",
   "statsDays": "天数",
   
-  "aiChatTitle": "AI 聊天",
+  "aiChatTitle": "聊天历史",
   "aiChatEmpty": "开始与 AI 对话",
   "aiChatHistoryEmpty": "暂无聊天历史",
   "aiChatSend": "发送",
@@ -127,6 +127,15 @@
   "aiChatMentionNotes": "笔记",
   "aiChatMentionTags": "标签",
   "aiChatMentionLocations": "位置",
+  "aiChatMentionSearchNotes": "搜索笔记...",
+  "aiChatMentionSearchTags": "搜索标签...",
+  "aiChatMentionSearchLocations": "搜索地点...",
+  "aiChatMentionSearchAll": "添加笔记，地点，标签...",
+  "aiChatMentionNoRecentItems": "无最近提及项目",
+  "aiChatMentionNoNotes": "没有笔记",
+  "aiChatMentionNoTags": "没有标签",
+  "aiChatMentionNoLocations": "没有地点",
+  "aiChatMentionNoSearchResults": "无搜索结果",
   
   "cancel": "取消",
   "save": "保存",
@@ -137,5 +146,57 @@
   "yes": "是",
   "no": "否",
   "confirm": "确认",
-  "apply": "应用"
+  "apply": "应用",
+  
+  "homeAppBarLocationButton": "位置",
+  "homeAppBarTagButton": "标签",
+  "homeAppBarSearchButton": "搜索",
+  "homeAppBarMenuButton": "菜单",
+  
+  "chatHistoryTitle": "聊天历史",
+  "chatHistoryEmpty": "暂无聊天历史",
+  "chatHistoryEmptyDescription": "与AI助手的对话将会保存在这里",
+  "chatHistoryRefresh": "刷新",
+  "chatHistoryDelete": "删除",
+  "chatHistoryDeleteConfirmation": "删除聊天历史",
+  "chatHistoryDeleteConfirmationDescription": "确定要删除\"{title}\"吗？这个操作不可撤销。",
+  "@chatHistoryDeleteConfirmationDescription": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "chatHistoryMessagesCount": "{count} 条消息",
+  "@chatHistoryMessagesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatHistoryToday": "今天 {time}",
+  "@chatHistoryToday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "chatHistoryYesterday": "昨天 {time}",
+  "@chatHistoryYesterday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "chatHistoryDaysAgo": "{days}天前",
+  "@chatHistoryDaysAgo": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  }
 } 

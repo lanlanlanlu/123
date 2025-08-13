@@ -1,7 +1,7 @@
 {
   "@@locale": "en",
   
-  "appTitle": "Record App",
+  "appTitle": "Record",
   
   "searchHint": "Search notes, tags, locations...",
   "searchNoResults": "No search results found",
@@ -117,7 +117,7 @@
   "statsChars": "Chars",
   "statsDays": "Days",
   
-  "aiChatTitle": "AI Chat",
+  "aiChatTitle": "Chat History",
   "aiChatEmpty": "Start a conversation with AI",
   "aiChatHistoryEmpty": "No chat history yet",
   "aiChatSend": "Send",
@@ -127,6 +127,15 @@
   "aiChatMentionNotes": "Notes",
   "aiChatMentionTags": "Tags",
   "aiChatMentionLocations": "Locations",
+  "aiChatMentionSearchNotes": "Search notes...",
+  "aiChatMentionSearchTags": "Search tags...",
+  "aiChatMentionSearchLocations": "Search locations...",
+  "aiChatMentionSearchAll": "Add notes, locations, tags...",
+  "aiChatMentionNoRecentItems": "No recent mentions",
+  "aiChatMentionNoNotes": "No notes",
+  "aiChatMentionNoTags": "No tags",
+  "aiChatMentionNoLocations": "No locations",
+  "aiChatMentionNoSearchResults": "No search results",
   
   "cancel": "Cancel",
   "save": "Save",
@@ -137,5 +146,57 @@
   "yes": "Yes",
   "no": "No",
   "confirm": "Confirm",
-  "apply": "Apply"
+  "apply": "Apply",
+  
+  "homeAppBarLocationButton": "Locations",
+  "homeAppBarTagButton": "Tags",
+  "homeAppBarSearchButton": "Search",
+  "homeAppBarMenuButton": "Menu",
+  
+  "chatHistoryTitle": "Chat History",
+  "chatHistoryEmpty": "No chat history yet",
+  "chatHistoryEmptyDescription": "Your conversations with AI will be saved here",
+  "chatHistoryRefresh": "Refresh",
+  "chatHistoryDelete": "Delete",
+  "chatHistoryDeleteConfirmation": "Delete Chat History",
+  "chatHistoryDeleteConfirmationDescription": "Are you sure you want to delete \"{title}\"? This action cannot be undone.",
+  "@chatHistoryDeleteConfirmationDescription": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "chatHistoryMessagesCount": "{count} messages",
+  "@chatHistoryMessagesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatHistoryToday": "Today {time}",
+  "@chatHistoryToday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "chatHistoryYesterday": "Yesterday {time}",
+  "@chatHistoryYesterday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "chatHistoryDaysAgo": "{days} days ago",
+  "@chatHistoryDaysAgo": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  }
 } 

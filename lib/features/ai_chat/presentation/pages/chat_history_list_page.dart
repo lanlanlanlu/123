@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:record_app/data/database/database.dart';
 import 'package:record_app/data/repository/ai_chat_repository.dart';
@@ -338,19 +339,19 @@ class _ChatHistoryListPageState extends State<ChatHistoryListPage> {
     
     if (difference.inDays == 0) {
       // 今天，显示时间
-      return '今天 ${DateFormat('HH:mm').format(dateTime)}';
+      return '${AppLocalizations.of(context)!.homeTabRecent} ${DateFormat('HH:mm').format(dateTime)}';
     } else if (difference.inDays == 1) {
       // 昨天
-      return '昨天 ${DateFormat('HH:mm').format(dateTime)}';
+      return '${AppLocalizations.of(context)!.homeTabRecent} ${DateFormat('HH:mm').format(dateTime)}';
     } else if (difference.inDays < 7) {
       // 一周内
-      return '${difference.inDays}天前';
+      return '${difference.inDays} ${AppLocalizations.of(context)!.statsDays}';
     } else {
       // 超过一周
       return DateFormat('MM-dd HH:mm').format(dateTime);
     }
   }
-
+  
   /// 恢复历史聊天记录
   Future<void> _restoreHistoryChat(ChatHistory history, AiChatRepository aiChatRepository) async {
     setState(() {
@@ -413,10 +414,11 @@ class _ChatHistoryListPageState extends State<ChatHistoryListPage> {
   Widget build(BuildContext context) {
     // 获取AiChatRepository实例
     final aiChatRepository = context.read<AiChatRepository>();
+    final s = AppLocalizations.of(context)!;
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('聊天历史'),
+        title: Text(s.aiChatTitle),
         centerTitle: true,
         actions: [
           // 刷新按钮
@@ -446,30 +448,32 @@ class _ChatHistoryListPageState extends State<ChatHistoryListPage> {
   
   /// 构建空视图
   Widget _buildEmptyView() {
+    final s = AppLocalizations.of(context)!;
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.history, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
-          const Text(
-            '没有聊天历史记录',
-            style: TextStyle(
+          Text(
+            s.aiChatHistoryEmpty,
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            '与AI助手的对话将会保存在这里',
-            style: TextStyle(
+          Text(
+            s.aiChatEmpty,
+            style: const TextStyle(
               color: Colors.grey,
             ),
           ),
           const SizedBox(height: 24),
           TextButton.icon(
             icon: const Icon(Icons.refresh),
-            label: const Text('刷新'),
+            label: Text(s.apply),
             onPressed: _loadHistories,
           ),
         ],
@@ -479,6 +483,8 @@ class _ChatHistoryListPageState extends State<ChatHistoryListPage> {
   
   /// 构建历史记录项
   Widget _buildHistoryItem(ChatHistory history, AiChatRepository aiChatRepository) {
+    final s = AppLocalizations.of(context)!;
+    
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
       child: InkWell(
@@ -534,7 +540,7 @@ class _ChatHistoryListPageState extends State<ChatHistoryListPage> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        '${history.messageCount} 条消息',
+                        '${history.messageCount} ${s.statsNotes}',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[700],
@@ -561,22 +567,24 @@ class _ChatHistoryListPageState extends State<ChatHistoryListPage> {
   
   /// 显示删除确认对话框
   void _showDeleteConfirmation(ChatHistory history) {
+    final s = AppLocalizations.of(context)!;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除聊天历史'),
-        content: Text('确定要删除"${history.title}"吗？这个操作不可撤销。'),
+        title: Text(s.delete),
+        content: Text('${s.noteDetailDeleteConfirmation} "${history.title}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
+            child: Text(s.cancel),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
               _deleteHistory(history);
             },
-            child: const Text('删除'),
+            child: Text(s.delete),
             style: TextButton.styleFrom(
               foregroundColor: Colors.red,
             ),

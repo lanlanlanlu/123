@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:record_app/data/repository/index.dart';
 import 'package:record_app/features/home/presentation/bloc/app_bar_bloc.dart';
 import 'package:record_app/features/home/presentation/bloc/home_bloc.dart';
@@ -36,6 +37,8 @@ class HomeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocalizations.of(context)!;
+    
     // 【修改】移除了 Scaffold，只返回 body 内容
     return BlocConsumer<HomeBloc, HomeState>(
       listener: (context, state) {
@@ -65,7 +68,7 @@ class HomeView extends StatelessWidget {
             ),
           );
         } else if (state is HomeLoadFailure) {
-          return Center(child: Text('加载失败: ${state.message}'));
+          return Center(child: Text('${s.aiChatError}: ${state.message}'));
         }
         return const Center(child: CircularProgressIndicator());
       },

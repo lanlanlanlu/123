@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../bloc/calendar_state.dart';
 import '../../../home/presentation/widgets/note_list.dart';
 
@@ -9,6 +10,8 @@ class CalendarNotesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocalizations.of(context)!;
+    
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -17,7 +20,7 @@ class CalendarNotesList extends StatelessWidget {
       return Center(
         child: SelectableText.rich(
           TextSpan(
-            text: '加载失败: ${state.error}',
+            text: '${s.aiChatError}: ${state.error}',
             style: const TextStyle(color: Colors.red),
           ),
         ),
@@ -45,19 +48,21 @@ class CalendarEmptyNotesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    final s = AppLocalizations.of(context)!;
+    
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
+          const Icon(
             Icons.inventory_2_outlined,
             size: 80,
             color: Colors.grey,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
-            'NoThing ~',
-            style: TextStyle(
+            s.calendarNoNotesOnDate(''),
+            style: const TextStyle(
               fontSize: 24,
               color: Colors.grey,
               fontWeight: FontWeight.w300,

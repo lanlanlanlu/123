@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart'; // 添加Provider导入
 import 'package:record_app/features/calendar/presentation/pages/calendar_page.dart';
@@ -207,6 +208,8 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocalizations.of(context)!;
+    
     return BlocProvider(
       create: (context) => AppBarBloc(),
       child: BlocBuilder<AppBarBloc, AppBarState>(
@@ -218,7 +221,7 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 // 标题
                 Text(
-                  '笔记',
+                  s.appTitle,
                   style: Theme.of(context).appBarTheme.titleTextStyle?.copyWith(
                     fontWeight: FontWeight.w400,
                   ),
@@ -227,14 +230,17 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                 // 右侧图标按钮
                 IconButton(
                   icon: const Icon(Icons.location_on_outlined),
+                  tooltip: s.locationsTitle,
                   onPressed: () => context.read<AppBarBloc>().add(AppBarLocationPressed(context)),
                 ),
                 IconButton(
                   icon: const Icon(Icons.tag),
+                  tooltip: s.tagsTitle,
                   onPressed: () => context.read<AppBarBloc>().add(AppBarTagPressed(context)),
                 ),
                 IconButton(
                   icon: const Icon(Icons.search),
+                  tooltip: s.searchHint,
                   onPressed: () {
                     // 导航到搜索页面，使用push路径而不是pushNamed
                     context.push('/search');
@@ -242,6 +248,7 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 IconButton(
                   icon: const Icon(Icons.menu),
+                  tooltip: s.settingsTitle,
                   onPressed: () => context.read<AppBarBloc>().add(AppBarMenuPressed()),
                 ),
               ],
@@ -271,11 +278,18 @@ class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocalizations.of(context)!;
+    
     return BlocBuilder<CalendarBloc, CalendarState>(
       builder: (context, state) {
         final selectedDate = state.selectedDate;
         final now = DateTime.now();
-        final weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        
+        // 使用本地化的星期几
+        final locale = Localizations.localeOf(context).languageCode;
+        final weekdays = locale == 'zh' 
+            ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+            : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         final weekdayText = weekdays[selectedDate.weekday - 1];
 
         return AppBar(
@@ -288,7 +302,9 @@ class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
             children: [
               // 左边：几月几号
               Text(
-                '${selectedDate.month}月${selectedDate.day}日',
+                locale == 'zh'
+                    ? '${selectedDate.month}月${selectedDate.day}日'
+                    : '${selectedDate.month}/${selectedDate.day}',
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w400,

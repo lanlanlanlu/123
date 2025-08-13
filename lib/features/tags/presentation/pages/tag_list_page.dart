@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:record_app/data/database/database.dart';
 import 'package:record_app/data/repository/index.dart';
 import 'package:record_app/features/tags/presentation/bloc/tag_list_bloc.dart';
@@ -38,9 +39,11 @@ class _TagListViewState extends State<TagListView> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocalizations.of(context)!;
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text('所有标签'),
+        title: Text(s.tagsTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(_hasTagDeleted), // 返回时传递是否有标签被删除
@@ -53,7 +56,7 @@ class _TagListViewState extends State<TagListView> {
               _hasTagDeleted = true; // 标记有标签被删除
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('标签已删除')),
+              SnackBar(content: Text(s.delete)),
             );
           } else if (state is TagOperationSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -74,7 +77,7 @@ class _TagListViewState extends State<TagListView> {
           } else if (state is TagListLoaded) {
             return _buildTagList(context, state.tags, state.tagYears);
           } else if (state is TagListError) {
-            return Center(child: Text('加载失败: ${state.message}'));
+            return Center(child: Text('${s.aiChatError}: ${state.message}'));
           }
           
           return const Center(child: CircularProgressIndicator());
@@ -84,20 +87,22 @@ class _TagListViewState extends State<TagListView> {
   }
   
   Widget _buildTagList(BuildContext context, List<Tag> tags, Set<String> years) {
+    final s = AppLocalizations.of(context)!;
+    
     if (tags.isEmpty && years.isEmpty) {
-      return const Center(child: Text('没有标签'));
-            }
+      return Center(child: Text(s.tagsEmptyTitle));
+    }
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 年份标签部分
           if (years.isNotEmpty) ...[
-            const Text(
-              '按年份浏览',
-              style: TextStyle(
+            Text(
+              '按年份浏览', // TODO: 添加本地化字符串
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -113,9 +118,9 @@ class _TagListViewState extends State<TagListView> {
           
           // 普通标签部分
           if (tags.isNotEmpty) ...[
-            const Text(
-              '所有标签',
-              style: TextStyle(
+            Text(
+              s.tagsTitle,
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),

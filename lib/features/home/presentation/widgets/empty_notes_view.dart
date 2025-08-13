@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// 空笔记视图组件，当没有笔记时显示的提示信息
 class EmptyNotesView extends StatelessWidget {
@@ -6,11 +7,13 @@ class EmptyNotesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    final s = AppLocalizations.of(context)!;
+    
+    return Center(
       child: Text(
-        '还没有笔记，\n点击右下角的 "+" 添加第一条吧！',
+        s.noteListEmptyDescription,
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 18, color: Colors.grey),
+        style: const TextStyle(fontSize: 18, color: Colors.grey),
       ),
     );
   }
