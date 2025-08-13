@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:record_app/main.dart';  // 导入LocaleCubit
+import 'package:flutter_gen/gen_l10n/app_localizations.dart'; // 导入本地化类
 import 'custom_dropdown_menu.dart' as custom;  // 导入自定义下拉菜单，使用别名
 
 class UserInterfaceCard extends StatefulWidget {
@@ -19,6 +20,8 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocalizations.of(context)!; // 获取本地化实例
+    
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       shape: RoundedRectangleBorder(
@@ -32,9 +35,7 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
           Padding(
             padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 16.0, bottom: 8.0),
             child: Text(
-              Localizations.localeOf(context).languageCode == 'zh'
-                  ? '用户界面'
-                  : 'User Interface',
+              s.settingsUserInterfaceTitle,
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -46,12 +47,8 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
           _buildSwitchItem(
             context,
             icon: Icons.palette,
-            title: Localizations.localeOf(context).languageCode == 'zh'
-                ? '动态颜色'
-                : 'Dynamic Color',
-            subtitle: Localizations.localeOf(context).languageCode == 'zh'
-                ? '应用来自于主题的颜色'
-                : 'Apply colors from theme',
+            title: s.settingsDynamicColor,
+            subtitle: s.settingsDynamicColorSubtitle,
             value: _dynamicColorEnabled,
             onChanged: (value) {
               setState(() {
@@ -64,20 +61,20 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
           _buildSettingItem(
             context,
             icon: Icons.language,
-            title: Localizations.localeOf(context).languageCode == 'zh'
-                ? '语言'
-                : 'Language',
+            title: s.settingsLanguage,
             trailing: _buildCustomDropdown(
               value: Localizations.localeOf(context).languageCode,
               onChanged: (value) {
                 if (value != null) {
+                  // 创建新的Locale对象
                   final newLocale = Locale(value);
-                  context.read<LocaleCubit>().changeLocale(newLocale);
+                  // 调用main.dart中的saveLocale函数保存语言设置
+                  saveLocale(context, newLocale);
                 }
               },
               items: [
-                _buildDropdownItem('zh', Localizations.localeOf(context).languageCode == 'zh' ? '中文' : 'Chinese'),
-                _buildDropdownItem('en', Localizations.localeOf(context).languageCode == 'zh' ? '英文' : 'English'),
+                _buildDropdownItem('zh', s.settingsLanguageChinese),
+                _buildDropdownItem('en', s.settingsLanguageEnglish),
               ],
               width: 120.0,
             ),
@@ -87,9 +84,7 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
           _buildSettingItem(
             context,
             icon: Icons.brightness_6,
-            title: Localizations.localeOf(context).languageCode == 'zh'
-                ? '主题模式'
-                : 'Theme Mode',
+            title: s.settingsTheme,
             trailing: _buildCustomDropdown(
               value: _themeMode,
               onChanged: (value) {
@@ -100,18 +95,9 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
                 }
               },
               items: [
-                _buildDropdownItem(
-                  'system', 
-                  Localizations.localeOf(context).languageCode == 'zh' ? '跟随系统' : 'Follow system'
-                ),
-                _buildDropdownItem(
-                  'light', 
-                  Localizations.localeOf(context).languageCode == 'zh' ? '浅色' : 'Light'
-                ),
-                _buildDropdownItem(
-                  'dark', 
-                  Localizations.localeOf(context).languageCode == 'zh' ? '深色' : 'Dark'
-                ),
+                _buildDropdownItem('system', s.settingsThemeSystem),
+                _buildDropdownItem('light', s.settingsThemeLight),
+                _buildDropdownItem('dark', s.settingsThemeDark),
               ],
               width: 150.0,
             ),
@@ -121,9 +107,7 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
           _buildSettingItem(
             context,
             icon: Icons.format_list_numbered,
-            title: Localizations.localeOf(context).languageCode == 'zh'
-                ? '首页卡片最大行数'
-                : 'Max card lines',
+            title: s.settingsMaxCardLines,
             trailing: _buildCustomDropdown(
               value: _maxCardLines,
               onChanged: (value) {
@@ -148,7 +132,7 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
     );
   }
   
-  // 【核心修改】使用Builder来获取正确的context
+  // 使用Builder来获取正确的context
   Widget _buildCustomDropdown<T>({
     required T value,
     required ValueChanged<T?> onChanged,

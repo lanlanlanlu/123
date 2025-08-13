@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:simple_heatmap_calendar/simple_heatmap_calendar.dart';
 import '../bloc/settings_heat_map_bloc.dart';
 import '../bloc/settings_heat_map_state.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class HeatMapChartWidget extends StatefulWidget {
   const HeatMapChartWidget({super.key});
@@ -46,6 +47,8 @@ class _HeatMapChartWidgetState extends State<HeatMapChartWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocalizations.of(context)!;
+    
     return BlocBuilder<SettingsHeatMapBloc, SettingsHeatMapState>(
       builder: (context, state) {
         if (state.isLoading) {
@@ -59,11 +62,7 @@ class _HeatMapChartWidgetState extends State<HeatMapChartWidget> {
 
         if (state.heatMapData.isEmpty) {
           return Center(
-            child: Text(
-              Localizations.localeOf(context).languageCode == 'zh'
-                  ? '没有可用的笔记创建数据'
-                  : 'No note creation data available'
-            ),
+            child: Text(s.heatMapNoData),
           );
         }
 

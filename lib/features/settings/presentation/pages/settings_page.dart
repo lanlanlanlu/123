@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:record_app/data/repository/notes_repository.dart';
 import 'package:record_app/data/repository/tags_repository.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../bloc/settings_heat_map_bloc.dart';
 import '../bloc/settings_heat_map_event.dart';
 import '../bloc/settings_stats_bloc.dart';
@@ -16,6 +17,8 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocalizations.of(context)!;
+    
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -24,10 +27,8 @@ class SettingsPage extends StatelessWidget {
         title: Row(
           children: [
             Text(
-              Localizations.localeOf(context).languageCode == 'zh' 
-                  ? '设置' 
-                  : 'Settings',
-              style: TextStyle(
+              s.settingsTitle,
+              style: const TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w400,
                 color: Colors.black,

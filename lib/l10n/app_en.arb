@@ -1,0 +1,141 @@
+{
+  "@@locale": "en",
+  
+  "appTitle": "Record App",
+  
+  "searchHint": "Search notes, tags, locations...",
+  "searchNoResults": "No search results found",
+  "searchLoading": "Searching...",
+  
+  "noteListEmptyTitle": "No notes yet",
+  "noteListEmptyDescription": "Your notes will appear here",
+  "notePinned": "Pinned",
+  "noteArchived": "Archived",
+  "noteDeleted": "Deleted",
+  "noteUntitled": "Untitled",
+  
+  "noteDetailSaved": "Note saved",
+  "noteDetailDeleteConfirmation": "Are you sure you want to delete this note?",
+  "noteDetailDelete": "Delete",
+  "noteDetailRestore": "Restore",
+  "noteDetailEdit": "Edit",
+  "noteDetailShare": "Share",
+  "noteDetailPinNote": "Pin Note",
+  "noteDetailUnpinNote": "Unpin Note",
+  "noteDetailArchiveNote": "Archive Note",
+  "noteDetailUnarchiveNote": "Unarchive Note",
+  "noteDetailAddTag": "Add Tag",
+  "noteDetailAddLocation": "Add Location",
+  "noteDetailRemoteUpdateTitle": "Remote Update Available",
+  "noteDetailRemoteUpdateDescription": "This note has been updated on another device. Would you like to apply the remote changes?",
+  "noteDetailRemoteUpdateApply": "Apply Updates",
+  "noteDetailRemoteUpdateKeepLocal": "Keep Local Version",
+  
+  "homeTabRecent": "Recent",
+  "homeTabPinned": "Pinned",
+  "homeTabArchived": "Archived",
+  "homeTabDeleted": "Deleted",
+  
+  "tagsTitle": "Tags",
+  "tagsEmptyTitle": "No tags yet",
+  "tagsEmptyDescription": "Create tags to organize your notes",
+  "tagCreateNew": "Create new tag",
+  "tagDeleteConfirmation": "Are you sure you want to delete this tag?",
+  
+  "locationsTitle": "Locations",
+  "locationsEmptyTitle": "No locations yet",
+  "locationsEmptyDescription": "Add locations to your notes for better organization",
+  
+  "calendarTitle": "Calendar",
+  "calendarNotesOnDate": "Notes on {date}",
+  "@calendarNotesOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "calendarNoNotesOnDate": "No notes on {date}",
+  "@calendarNoNotesOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  
+  "settingsTitle": "Settings",
+  "settingsTheme": "Theme",
+  "settingsThemeLight": "Light",
+  "settingsThemeDark": "Dark",
+  "settingsThemeSystem": "System",
+  "settingsLanguage": "Language",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageChinese": "中文",
+  "settingsNotifications": "Notifications",
+  "settingsDataAndSecurity": "Data & Security",
+  "settingsDataManagement": "Data Management",
+  "settingsFingerprintSecurity": "Fingerprint Security",
+  "settingsRandomWalk": "Random Walk",
+  "settingsPhotoGallery": "Photo Gallery",
+  "settingsTagCorrection": "Tag Correction",
+  "settingsAppearance": "Appearance",
+  "settingsAbout": "About",
+  "settingsUserInterfaceTitle": "User Interface",
+  "settingsStatisticsTitle": "Statistics",
+  "settingsStatisticsNotesCount": "{count} notes in total",
+  "@settingsStatisticsNotesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsStatisticsTagsCount": "{count} tags in total",
+  "@settingsStatisticsTagsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsStatisticsLocationsCount": "{count} locations in total",
+  "@settingsStatisticsLocationsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "settingsDynamicColor": "Dynamic Color",
+  "settingsDynamicColorSubtitle": "Apply colors from theme",
+  "settingsMaxCardLines": "Max card lines",
+  
+  "heatMapNoData": "No note creation data available",
+  "statsNotes": "Notes",
+  "statsChars": "Chars",
+  "statsDays": "Days",
+  
+  "aiChatTitle": "AI Chat",
+  "aiChatEmpty": "Start a conversation with AI",
+  "aiChatHistoryEmpty": "No chat history yet",
+  "aiChatSend": "Send",
+  "aiChatTypeMessage": "Type a message...",
+  "aiChatModelSelector": "Select AI Model",
+  "aiChatError": "An error occurred",
+  "aiChatMentionNotes": "Notes",
+  "aiChatMentionTags": "Tags",
+  "aiChatMentionLocations": "Locations",
+  
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "edit": "Edit",
+  "create": "Create",
+  "ok": "OK",
+  "yes": "Yes",
+  "no": "No",
+  "confirm": "Confirm",
+  "apply": "Apply"
+} 

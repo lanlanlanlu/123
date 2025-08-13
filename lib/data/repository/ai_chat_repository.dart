@@ -29,15 +29,16 @@ class AiChatRepository {
   // 获取本地服务器的正确地址
   String get _apiBaseUrl {
     // 对于安卓模拟器，主机PC的localhost是 10.0.2.2
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000';
-    } 
-    // 对于iOS模拟器或桌面平台，可以直接用 localhost
-    else {
-      return 'http://192.168.150.1:8000';
-    }
+    // if (Platform.isAndroid) {
+    //   return 'http://10.0.2.2:8000';
+    // } 
+    // // 对于iOS模拟器或桌面平台，可以直接用 localhost
+    // else {
+    //   return 'http://192.168.150.1:8000';
+    // }
     // 注意: 如果你使用物理手机进行调试，需要将这里的地址换成你电脑的局域网IP
     // 例如: 'http://192.168.150.1:8000'
+    return 'http://34.142.43.133:8000';
   }
   
   /// 设置当前使用的模型

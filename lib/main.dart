@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'firebase_options.dart';
+import 'package:record_app/app/routes/app_router.dart';
 import 'package:record_app/data/database/connection/connection.dart';
 import 'package:record_app/data/database/database.dart';
 import 'package:record_app/data/repository/index.dart';
-import 'package:record_app/app/routes/app_router.dart';
-import 'package:record_app/features/ai_chat/presentation/providers/model_provider.dart';
 import 'package:record_app/features/home/presentation/bloc/home_bloc.dart';
 import 'package:record_app/features/home/presentation/bloc/home_event.dart';
 import 'package:record_app/features/home/presentation/bloc/search_bloc.dart';
@@ -15,15 +16,15 @@ import 'package:record_app/data/database/connection/native.dart' show closeDatab
 import 'package:record_app/core/utils/search_service.dart';
 import 'package:record_app/core/services/sync_service.dart'; // 导入同步服务
 import 'package:cloud_firestore/cloud_firestore.dart'; // 导入Firestore
-import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:firebase_core/firebase_core.dart'; // 1. 导入
-import 'firebase_options.dart'; // 2. 导入自动生成的文件
+import 'package:provider/provider.dart';
+import 'package:record_app/features/ai_chat/presentation/providers/model_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+// 导入自动生成的本地化类
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 // 添加语言管理Cubit
 class LocaleCubit extends Cubit<Locale?> {
-  LocaleCubit() : super(null);
+  LocaleCubit([Locale? initialLocale]) : super(initialLocale);
   
   void changeLocale(Locale locale) {
     emit(locale);
@@ -44,8 +45,14 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 初始化中文日期格式
-  await initializeDateFormatting('zh_CN', null);
+  // 获取存储的语言设置
+  final prefs = await SharedPreferences.getInstance();
+  final String? languageCode = prefs.getString('language_code');
+  Locale? initialLocale;
+  
+  if (languageCode != null) {
+    initialLocale = Locale(languageCode);
+  }
 
   // 初始化数据库和仓库 (单例模式)
   await _initializeDependencies();
@@ -57,7 +64,7 @@ void main() async {
   await _initializeSyncService();
   
   // 启动应用
-  runApp(const App());
+  runApp(App(initialLocale: initialLocale));
 }
 
 /// 初始化所有依赖
@@ -176,7 +183,9 @@ Future<void> _ensureChatHistoryTables() async {
 
 /// 应用根Widget
 class App extends StatefulWidget {
-  const App({super.key});
+  final Locale? initialLocale;
+  
+  const App({super.key, this.initialLocale});
 
   @override
   State<App> createState() => _AppState();
@@ -262,7 +271,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         providers: [
           // 添加语言Cubit
           BlocProvider<LocaleCubit>(
-            create: (context) => LocaleCubit(),
+            create: (context) => LocaleCubit(widget.initialLocale),
           ),
           // 首页Bloc
           BlocProvider<HomeBloc>(
@@ -336,17 +345,14 @@ class MyApp extends StatelessWidget {
                 ),
               ),
             ),
-            // 添加国际化支持
-            localizationsDelegates: const [
+            // 使用自动生成的本地化委托
+            localizationsDelegates: [
+              AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            // 支持的语言列表
-            supportedLocales: const [
-              Locale('en', 'US'), // 英语
-              Locale('zh', 'CN'), // 中文
-            ],
+            supportedLocales: AppLocalizations.supportedLocales,
             // 使用用户选择的语言或默认语言
             locale: locale,
             routerConfig: router,
@@ -355,4 +361,13 @@ class MyApp extends StatelessWidget {
       },
     );
   }
+}
+
+// 保存语言设置函数
+Future<void> saveLocale(BuildContext context, Locale locale) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('language_code', locale.languageCode);
+  
+  // 更新语言状态
+  context.read<LocaleCubit>().changeLocale(locale);
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'custom_dropdown_menu.dart' as custom;
 
 class DataSecurityCard extends StatefulWidget {
@@ -14,7 +15,7 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
   
   @override
   Widget build(BuildContext context) {
-    final isZh = Localizations.localeOf(context).languageCode == 'zh';
+    final s = AppLocalizations.of(context)!;
     
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -29,7 +30,7 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
           Padding(
             padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 16.0, bottom: 8.0),
             child: Text(
-              isZh ? '数据与安全' : 'Data & Security',
+              s.settingsDataAndSecurity,
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -41,7 +42,7 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
           _buildSwitchItem(
             context,
             icon: Icons.fingerprint,
-            title: isZh ? '指纹安全' : 'Fingerprint Security',
+            title: s.settingsFingerprintSecurity,
             value: _fingerprintEnabled,
             onChanged: (value) {
               setState(() {
@@ -54,7 +55,7 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
           _buildNavigationItem(
             context,
             icon: Icons.storage,
-            title: isZh ? '数据管理' : 'Data Management',
+            title: s.settingsDataManagement,
             onTap: () {
               // TODO: 导航到数据管理页面
             },
@@ -64,7 +65,7 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
           _buildNavigationItem(
             context,
             icon: Icons.shuffle,
-            title: isZh ? '随机漫步' : 'Random Walk',
+            title: s.settingsRandomWalk,
             onTap: () {
               // TODO: 导航到随机漫步页面
             },
@@ -74,7 +75,7 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
           _buildNavigationItem(
             context,
             icon: Icons.photo_library,
-            title: isZh ? '相册浏览' : 'Photo Gallery',
+            title: s.settingsPhotoGallery,
             onTap: () {
               // TODO: 导航到相册浏览页面
             },
@@ -84,7 +85,7 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
           _buildNavigationItem(
             context,
             icon: Icons.label,
-            title: isZh ? '标签修正' : 'Tag Correction',
+            title: s.settingsTagCorrection,
             onTap: () {
               // TODO: 导航到标签修正页面
             },

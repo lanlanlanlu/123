@@ -1,0 +1,141 @@
+{
+  "@@locale": "zh",
+  
+  "appTitle": "记录应用",
+  
+  "searchHint": "搜索笔记、标签、位置...",
+  "searchNoResults": "未找到搜索结果",
+  "searchLoading": "搜索中...",
+  
+  "noteListEmptyTitle": "暂无笔记",
+  "noteListEmptyDescription": "您的笔记将显示在这里",
+  "notePinned": "已置顶",
+  "noteArchived": "已归档",
+  "noteDeleted": "已删除",
+  "noteUntitled": "无标题",
+  
+  "noteDetailSaved": "笔记已保存",
+  "noteDetailDeleteConfirmation": "确定要删除这条笔记吗？",
+  "noteDetailDelete": "删除",
+  "noteDetailRestore": "恢复",
+  "noteDetailEdit": "编辑",
+  "noteDetailShare": "分享",
+  "noteDetailPinNote": "置顶笔记",
+  "noteDetailUnpinNote": "取消置顶",
+  "noteDetailArchiveNote": "归档笔记",
+  "noteDetailUnarchiveNote": "取消归档",
+  "noteDetailAddTag": "添加标签",
+  "noteDetailAddLocation": "添加位置",
+  "noteDetailRemoteUpdateTitle": "远程更新可用",
+  "noteDetailRemoteUpdateDescription": "此笔记已在其他设备上更新。是否应用远程更改？",
+  "noteDetailRemoteUpdateApply": "应用更新",
+  "noteDetailRemoteUpdateKeepLocal": "保留本地版本",
+  
+  "homeTabRecent": "最近",
+  "homeTabPinned": "置顶",
+  "homeTabArchived": "归档",
+  "homeTabDeleted": "已删除",
+  
+  "tagsTitle": "标签",
+  "tagsEmptyTitle": "暂无标签",
+  "tagsEmptyDescription": "创建标签以组织您的笔记",
+  "tagCreateNew": "创建新标签",
+  "tagDeleteConfirmation": "确定要删除这个标签吗？",
+  
+  "locationsTitle": "位置",
+  "locationsEmptyTitle": "暂无位置",
+  "locationsEmptyDescription": "添加位置到您的笔记以便更好地组织",
+  
+  "calendarTitle": "日历",
+  "calendarNotesOnDate": "{date}的笔记",
+  "@calendarNotesOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "calendarNoNotesOnDate": "{date}没有笔记",
+  "@calendarNoNotesOnDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  
+  "settingsTitle": "设置",
+  "settingsTheme": "主题",
+  "settingsThemeLight": "浅色",
+  "settingsThemeDark": "深色",
+  "settingsThemeSystem": "跟随系统",
+  "settingsLanguage": "语言",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageChinese": "中文",
+  "settingsNotifications": "通知",
+  "settingsDataAndSecurity": "数据与安全",
+  "settingsDataManagement": "数据管理",
+  "settingsFingerprintSecurity": "指纹安全",
+  "settingsRandomWalk": "随机漫步",
+  "settingsPhotoGallery": "相册浏览",
+  "settingsTagCorrection": "标签修正",
+  "settingsAppearance": "外观",
+  "settingsAbout": "关于",
+  "settingsUserInterfaceTitle": "用户界面",
+  "settingsStatisticsTitle": "统计",
+  "settingsStatisticsNotesCount": "共有{count}条笔记",
+  "@settingsStatisticsNotesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsStatisticsTagsCount": "共有{count}个标签",
+  "@settingsStatisticsTagsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsStatisticsLocationsCount": "共有{count}个位置",
+  "@settingsStatisticsLocationsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  
+  "settingsDynamicColor": "动态颜色",
+  "settingsDynamicColorSubtitle": "应用来自主题的颜色",
+  "settingsMaxCardLines": "首页卡片最大行数",
+  
+  "heatMapNoData": "没有可用的笔记创建数据",
+  "statsNotes": "笔记",
+  "statsChars": "字数",
+  "statsDays": "天数",
+  
+  "aiChatTitle": "AI 聊天",
+  "aiChatEmpty": "开始与 AI 对话",
+  "aiChatHistoryEmpty": "暂无聊天历史",
+  "aiChatSend": "发送",
+  "aiChatTypeMessage": "输入消息...",
+  "aiChatModelSelector": "选择 AI 模型",
+  "aiChatError": "发生错误",
+  "aiChatMentionNotes": "笔记",
+  "aiChatMentionTags": "标签",
+  "aiChatMentionLocations": "位置",
+  
+  "cancel": "取消",
+  "save": "保存",
+  "delete": "删除",
+  "edit": "编辑",
+  "create": "创建",
+  "ok": "确定",
+  "yes": "是",
+  "no": "否",
+  "confirm": "确认",
+  "apply": "应用"
+} 

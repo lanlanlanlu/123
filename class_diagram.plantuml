@@ -1,0 +1,238 @@
+@startuml
+!theme vibrant
+
+title 超详细的应用核心业务逻辑类图 (开发者视图)
+
+'---------------- skinparam ----------------
+skinparam linetype ortho
+skinparam shadowing false
+skinparam class {
+    BackgroundColor PaleGreen
+    ArrowColor SeaGreen
+    BorderColor SeaGreen
+    FontName "Noto Sans"
+}
+skinparam package {
+    BackgroundColor LightSteelBlue
+    BorderColor RoyalBlue
+    FontName "Noto Sans"
+}
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+    FontName "Noto Sans"
+}
+
+'---------------- Packages ----------------
+
+package "UI (界面层)" <<Frame>> {
+    class AppRouter <<Router>>
+    class HomePage <<Page>> {
+        + build(context): Widget
+    }
+    class NoteDetailPage <<Page>> {
+        + noteId: int
+        + build(context): Widget
+    }
+    class AiChatPage <<Page>> {
+        + build(context): Widget
+    }
+}
+
+package "BLoC (业务逻辑层)" <<Component>> {
+    class "Bloc<Event, State>" as GenericBloc
+
+    package "Home" {
+        class HomeBloc {
+            - _notesRepository: NotesRepository
+            + HomeBloc(notesRepository)
+        }
+        HomeBloc --|> GenericBloc
+        abstract HomeEvent
+        class HomeSubscriptionRequested extends HomeEvent
+        abstract HomeState
+        class HomeLoaded extends HomeState {
+            + final notes: List<NoteWithTags>
+        }
+    }
+
+    package "NoteDetail" {
+        class NoteDetailBloc {
+            - _notesRepository: NotesRepository
+            + NoteDetailBloc(notesRepository)
+        }
+        NoteDetailBloc --|> GenericBloc
+        abstract NoteDetailEvent
+        class NoteDetailSubscriptionRequested extends NoteDetailEvent {
+            + noteId: int
+        }
+        class NoteContentUpdated extends NoteDetailEvent {
+            + content: String
+        }
+        abstract NoteDetailState
+        class NoteDetailLoaded extends NoteDetailState {
+            + final note: NoteWithTags
+        }
+    }
+
+    package "AI Chat" {
+        class AiChatBloc {
+            - _aiChatRepository: AiChatRepository
+            - _notesRepository: NotesRepository
+            + AiChatBloc(aiChatRepository, notesRepository)
+        }
+        AiChatBloc --|> GenericBloc
+        abstract AiChatEvent
+        class AiChatSendMessage extends AiChatEvent {
+            + request: ChatRequest
+        }
+        abstract AiChatState
+        class AiChatLoaded extends AiChatState {
+            + final history: List<ChatMessage>
+        }
+        class AiChatResponseStreaming extends AiChatState {
+            + final partialResponse: String
+        }
+    }
+}
+
+package "Core Services" <<Service>> {
+    class SyncService {
+      + syncDownstream(): Future<void>
+      + syncUpstream(): Future<void>
+    }
+}
+
+package "Repository (数据仓库层)" <<Database>> {
+    class NotesRepository <<Repository>> {
+        - _noteDao: NoteDao
+        - _syncService: SyncService
+        + NotesRepository(noteDao, syncService)
+        + watchAllNotesWithTags(): Stream<List<NoteWithTags>>
+        + getNoteWithTags(id: int): Future<NoteWithTags>
+        + updateNote(note: Note, tags: List<Tag>): Future<void>
+        + createNote(content: String, tags: List<Tag>): Future<int>
+    }
+    class TagsRepository <<Repository>> {
+        - _tagDao: TagDao
+        + TagsRepository(tagDao)
+        + watchAllTags(): Stream<List<Tag>>
+        + getNotesForTag(tag: Tag): Future<List<NoteWithTags>>
+    }
+    class AiChatRepository <<Repository>> {
+        + sendMessage(request: ChatRequest): Future<Stream<String>>
+    }
+}
+
+package "Data Access (DAO & Database)" <<Storage>> {
+    class AppDatabase extends "_$AppDatabase" {
+        + noteDao: NoteDao
+        + tagDao: TagDao
+    }
+    note "Drift Database" as DbNote
+    AppDatabase .. DbNote
+
+    abstract class NoteDao {
+        + watchAllNotesWithTags(): Stream<List<NoteWithTags>>
+        + getNoteWithTags(id: int): Future<NoteWithTags>
+        + updateNote(note: Note): Future<bool>
+        + insertNote(note: Note): Future<int>
+    }
+    abstract class TagDao {
+        + watchAllTags(): Stream<List<Tag>>
+    }
+}
+
+package "Data Model (数据模型)" <<Data>> {
+    class Note <<Model>> {
+        + id: int
+        + content: String
+        + delta: String
+        + source: String
+        + createdAt: DateTime
+        + location: String
+    }
+    class Tag <<Model>> {
+        + id: int
+        + name: String
+        + color: int
+    }
+    class NoteWithTags <<Model>> {
+        + note: Note
+        + tags: List<Tag>
+    }
+    class ChatRequest <<Model>> {
+        + query: String
+        + references: List<ChatReference>
+    }
+    class ChatReference <<Model>> {
+        + noteId: int
+    }
+}
+
+
+'---------------- Relationships ----------------
+' UI -> BLoC
+HomePage ..> HomeBloc
+NoteDetailPage ..> NoteDetailBloc
+AiChatPage ..> AiChatBloc
+
+' BLoC -> Repository
+HomeBloc ..> NotesRepository
+NoteDetailBloc ..> NotesRepository
+AiChatBloc ..> AiChatRepository
+' AiChatBloc 也需要访问 NotesRepository 来获取引用
+AiChatBloc ..> NotesRepository
+
+' Repository -> DAO & Services
+NotesRepository ..> NoteDao
+TagsRepository ..> TagDao
+NotesRepository ..> SyncService
+
+' DAO -> Database (Composition)
+AppDatabase "1" *-- "1" NoteDao
+AppDatabase "1" *-- "1" TagDao
+
+' Repository -> Data Model (Dependency)
+NotesRepository ..> NoteWithTags
+TagsRepository ..> Tag
+AiChatRepository ..> ChatRequest
+
+' Data Model Relationships (Composition)
+NoteWithTags "1" *-- "1" Note
+NoteWithTags "1" *-- "0..*" Tag
+ChatRequest "1" *-- "0..*" ChatReference
+
+
+'---------------- Legend and Notes ----------------
+legend left
+  <b>图例</b>
+  ---
+  <<Page>>: UI 页面
+  <<BLoC>>: 业务逻辑组件
+  <<Repository>>: 数据仓库
+  <<Service>>: 核心服务
+  <<DAO>>: 数据访问对象
+  <<Router>>: 路由
+  <<Model>>: 数据模型
+  ..>: 依赖 (Dependency)
+  *--: 组合 (Composition)
+  -->: 关联 (Association)
+  <|-- / --|>: 继承 (Inheritance)
+  ---
+  <b>可见性</b>
+  +: public
+  -: private
+end legend
+
+note as N1
+  <b>响应式数据流 (Stream)</b>
+  这是一个核心概念，类似于 Android 的 LiveData/Flow。
+  1. <b>DAO</b> 中的 `watch...()` 方法返回一个 `Stream`。Drift 会在底层数据表变化时，自动向这个 `Stream` 推送新的数据。
+  2. <b>Repository</b> 将这个 `Stream` 直接暴露给 <b>BLoC</b>。
+  3. <b>BLoC</b> `listen` (监听) 这个 `Stream`。每当新数据到达时，BLoC 会发出一个新的 `State` (例如 `HomeLoaded`)，其中包含了最新的数据。
+  4. <b>UI</b> (通过 `BlocBuilder`) 监听到 `State` 的变化，并用新数据重建界面。
+  这个流程实现了从数据库到UI的完全响应式、自动化的更新。
+end note
+
+@enduml

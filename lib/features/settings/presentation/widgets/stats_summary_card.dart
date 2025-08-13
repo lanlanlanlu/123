@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/settings_stats_bloc.dart';
 import '../bloc/settings_stats_state.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class StatsSummaryCard extends StatelessWidget {
   const StatsSummaryCard({super.key});
@@ -18,8 +19,7 @@ class StatsSummaryCard extends StatelessWidget {
           return Center(child: Text(state.error!));
         }
 
-        final locale = Localizations.localeOf(context).languageCode;
-        final isZh = locale == 'zh';
+        final s = AppLocalizations.of(context)!;
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -36,28 +36,28 @@ class StatsSummaryCard extends StatelessWidget {
                 _buildStatItem(
                   context, 
                   state.noteCount.toString(), 
-                  isZh ? '笔记' : 'Notes'
+                  s.statsNotes // 使用国际化的"笔记"/"Notes"
                 ),
                 
                 // 字数
                 _buildStatItem(
                   context, 
                   state.characterCount.toString(), 
-                  isZh ? '字数' : 'Chars'
+                  s.statsChars // 使用国际化的"字数"/"Chars"
                 ),
                 
                 // 天数
                 _buildStatItem(
                   context, 
                   state.dayCount.toString(), 
-                  isZh ? '天数' : 'Days'
+                  s.statsDays // 使用国际化的"天数"/"Days"
                 ),
                 
                 // 标签数
                 _buildStatItem(
                   context, 
                   state.tagCount.toString(), 
-                  isZh ? '标签' : 'Tags'
+                  s.tagsTitle // 使用"标签"/"Tags"
                 ),
               ],
             ),
