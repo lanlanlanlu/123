@@ -15,6 +15,7 @@ import 'package:record_app/features/main_shell/presentation/bloc/main_shell_cubi
 import 'package:record_app/data/database/connection/native.dart' show closeDatabase;
 import 'package:record_app/core/utils/search_service.dart';
 import 'package:record_app/core/services/sync_service.dart'; // 导入同步服务
+import 'package:record_app/core/services/auth_service.dart'; // 导入生物认证服务
 import 'package:cloud_firestore/cloud_firestore.dart'; // 导入Firestore
 import 'package:provider/provider.dart';
 import 'package:record_app/features/ai_chat/presentation/providers/model_provider.dart';
@@ -24,6 +25,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 // 导入主题相关类
 import 'package:record_app/app/theme/app_theme.dart';
 import 'package:record_app/app/theme/theme_cubit.dart';
+import 'dart:io' show Platform; // 导入Platform
 
 // 添加语言管理Cubit
 class LocaleCubit extends Cubit<Locale?> {
@@ -195,11 +197,115 @@ class App extends StatefulWidget {
 }
 
 class _AppState extends State<App> with WidgetsBindingObserver {
+  // 添加认证状态
+  bool _isAuthenticated = false;
+  final BiometricAuthService _authService = BiometricAuthService();
+  // 添加防止重复认证的标志
+  bool _isAuthenticating = false;
+  // 添加静态变量记录上次认证时间
+  static DateTime? _lastAuthTime;
+  
+  // 安全获取本地化字符串
+  String _getLocalizedString(BuildContext context, String key, String defaultValue) {
+    try {
+      final s = AppLocalizations.of(context);
+      if (s == null) return defaultValue;
+      
+      switch (key) {
+        case 'authBiometricRequired':
+          return s.authBiometricRequired;
+        case 'authBiometricReason':
+          return s.authBiometricReason;
+        case 'ok':
+          return s.ok;
+        default:
+          return defaultValue;
+      }
+    } catch (e) {
+      debugPrint('获取本地化字符串失败: $e');
+      return defaultValue;
+    }
+  }
+  
   @override
   void initState() {
     super.initState();
     // 注册生命周期观察者，以便在应用退出时关闭数据库
     WidgetsBinding.instance.addObserver(this);
+    
+    // 检查是否需要生物认证
+    _checkBiometricAuth();
+  }
+
+  // 检查生物认证
+  Future<void> _checkBiometricAuth() async {
+    final isBiometricEnabled = await _authService.isBiometricEnabled();
+    
+    // 如果未启用生物认证，则直接通过认证
+    if (!isBiometricEnabled) {
+      setState(() {
+        _isAuthenticated = true;
+      });
+      return;
+    }
+    
+    // 延迟一点时间确保应用UI已加载
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 只在应用首次启动时进行认证，避免重复认证
+      if (!_isAuthenticated && !_isAuthenticating) {
+        _authenticate();
+      }
+    });
+  }
+  
+  // 执行认证
+  Future<void> _authenticate() async {
+    // 防止重复认证
+    if (_isAuthenticated || _isAuthenticating) return;
+    
+    // 设置认证中标志
+    _isAuthenticating = true;
+    
+    try {
+      // 检查设备是否支持生物认证
+      final isAvailable = await _authService.isBiometricAvailable();
+      if (!isAvailable) {
+        // 如果设备不支持，显示提示并禁用该功能
+        await _authService.setBiometricEnabled(false);
+        setState(() {
+          _isAuthenticated = true;
+        });
+        // 更新认证时间
+        _lastAuthTime = DateTime.now();
+        return;
+      }
+      
+      // 执行认证
+      final isAuthenticated = await _authService.authenticate(context);
+      
+      if (mounted) {
+        setState(() {
+          _isAuthenticated = isAuthenticated;
+        });
+      }
+      
+      // 如果认证成功，更新上次认证时间
+      if (isAuthenticated) {
+        _lastAuthTime = DateTime.now();
+        debugPrint('认证成功，更新认证时间: $_lastAuthTime');
+      }
+      
+      // 如果认证失败，尝试再次认证
+      if (!isAuthenticated && mounted) {
+        Future.delayed(const Duration(seconds: 1), () {
+          _isAuthenticating = false; // 重置认证中标志
+          _authenticate();
+        });
+      }
+    } finally {
+      // 确保认证过程结束后重置标志
+      _isAuthenticating = false;
+    }
   }
 
   @override
@@ -215,6 +321,51 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     if (state == AppLifecycleState.detached) {
       _closeDatabase();
     }
+    
+    // 当应用从后台恢复时，重新检查认证状态
+    if (state == AppLifecycleState.resumed) {
+      _checkBiometricAuthOnResume();
+    }
+  }
+  
+  // 应用从后台恢复时检查认证
+  Future<void> _checkBiometricAuthOnResume() async {
+    // 如果正在认证中，不要重复触发
+    if (_isAuthenticating) return;
+    
+    final isBiometricEnabled = await _authService.isBiometricEnabled();
+    
+    // 如果启用了生物认证，且之前已经通过验证，则需要重新验证
+    // 但在Windows平台上，避免重复验证
+    bool isWindows = false;
+    try {
+      isWindows = Platform.isWindows;
+    } catch (e) {
+      debugPrint('平台检测失败: $e');
+    }
+    
+    // 添加一个时间检查，避免短时间内重复触发认证
+    // 使用静态变量存储上次认证时间
+    final now = DateTime.now();
+    final lastAuthTime = _AppState._lastAuthTime;
+    final timeSinceLastAuth = lastAuthTime != null ? now.difference(lastAuthTime) : null;
+    
+    // 如果上次认证在30秒内，则不重新验证
+    if (timeSinceLastAuth != null && timeSinceLastAuth.inSeconds < 30) {
+      debugPrint('上次认证在30秒内，跳过重新认证');
+      return;
+    }
+    
+    if (isBiometricEnabled && _isAuthenticated && !isWindows && !_isAuthenticating) {
+      setState(() {
+        _isAuthenticated = false;
+      });
+      
+      // 延迟一点时间再显示认证界面
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _authenticate();
+      });
+    }
   }
 
   void _closeDatabase() {
@@ -229,6 +380,39 @@ class _AppState extends State<App> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // 如果未认证，显示一个锁屏界面
+    if (!_isAuthenticated) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Builder(
+          builder: (context) {
+            return Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.fingerprint, size: 64, color: Colors.deepPurple),
+                    const SizedBox(height: 16),
+                    Text(
+                      _getLocalizedString(context, 'authBiometricRequired', 'Authentication required'),
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _isAuthenticating ? null : () {
+                        _authenticate();
+                      },
+                      child: Text(_getLocalizedString(context, 'authBiometricReason', 'Authenticate')),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        ),
+      );
+    }
+    
     return MultiRepositoryProvider(
       providers: [
         // 数据库

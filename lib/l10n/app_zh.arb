@@ -198,5 +198,13 @@
         "type": "int"
       }
     }
-  }
+  },
+  
+  "authBiometricReason": "请进行身份验证以继续",
+  "authBiometricError": "验证错误",
+  "authBiometricNotAvailable": "此设备不支持或未配置生物识别验证",
+  "authBiometricRequired": "需要进行生物识别验证",
+  "authBiometricEnable": "启用生物识别验证",
+  "authBiometricDisable": "禁用生物识别验证",
+  "authBiometricNotSupported": "您的设备不支持生物识别验证"
 } 

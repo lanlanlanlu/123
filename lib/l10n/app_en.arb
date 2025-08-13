@@ -198,5 +198,13 @@
         "type": "int"
       }
     }
-  }
+  },
+  
+  "authBiometricReason": "Please authenticate to continue",
+  "authBiometricError": "Authentication Error",
+  "authBiometricNotAvailable": "Biometric authentication is not available or not configured on this device",
+  "authBiometricRequired": "Biometric authentication required",
+  "authBiometricEnable": "Enable biometric authentication",
+  "authBiometricDisable": "Disable biometric authentication",
+  "authBiometricNotSupported": "Your device doesn't support biometric authentication"
 } 
