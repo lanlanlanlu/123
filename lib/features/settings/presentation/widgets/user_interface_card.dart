@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:record_app/main.dart';  // 导入LocaleCubit
 import 'package:flutter_gen/gen_l10n/app_localizations.dart'; // 导入本地化类
+import 'package:record_app/app/theme/theme_cubit.dart'; // 导入主题Cubit
 import 'custom_dropdown_menu.dart' as custom;  // 导入自定义下拉菜单，使用别名
 
 class UserInterfaceCard extends StatefulWidget {
@@ -12,15 +13,28 @@ class UserInterfaceCard extends StatefulWidget {
 }
 
 class _UserInterfaceCardState extends State<UserInterfaceCard> {
-  // 动态颜色开关状态
-  bool _dynamicColorEnabled = true;
-  // 主题模式和卡片行数
-  String _themeMode = 'system';
+  // 卡片行数
   String _maxCardLines = '1000';
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // 从SharedPreferences读取卡片行数设置
+    _loadSettings();
+  }
+  
+  Future<void> _loadSettings() async {
+    // 从SharedPreferences读取卡片行数设置
+    // 这里可以添加实际的读取逻辑
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = AppLocalizations.of(context)!; // 获取本地化实例
+    final themeCubit = context.watch<ThemeCubit>(); // 获取主题Cubit
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -36,9 +50,10 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
             padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 16.0, bottom: 8.0),
             child: Text(
               s.settingsUserInterfaceTitle,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
               ),
             ),
           ),
@@ -49,11 +64,9 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
             icon: Icons.palette,
             title: s.settingsDynamicColor,
             subtitle: s.settingsDynamicColorSubtitle,
-            value: _dynamicColorEnabled,
+            value: themeCubit.state.isDynamicColorEnabled,
             onChanged: (value) {
-              setState(() {
-                _dynamicColorEnabled = value;
-              });
+              themeCubit.toggleDynamicColor(value);
             },
           ),
           
@@ -86,12 +99,22 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
             icon: Icons.brightness_6,
             title: s.settingsTheme,
             trailing: _buildCustomDropdown(
-              value: _themeMode,
+              value: themeCubit.getCurrentThemeModeString(),
               onChanged: (value) {
                 if (value != null) {
-                  setState(() {
-                    _themeMode = value;
-                  });
+                  ThemeMode newMode;
+                  switch (value) {
+                    case 'light':
+                      newMode = ThemeMode.light;
+                      break;
+                    case 'dark':
+                      newMode = ThemeMode.dark;
+                      break;
+                    case 'system':
+                    default:
+                      newMode = ThemeMode.system;
+                  }
+                  themeCubit.changeThemeMode(newMode);
                 }
               },
               items: [
@@ -115,6 +138,7 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
                   setState(() {
                     _maxCardLines = value;
                   });
+                  // 这里可以添加保存设置的逻辑
                 }
               },
               items: [
@@ -141,6 +165,9 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
   }) {
     return Builder(
       builder: (BuildContext context) {
+        final theme = Theme.of(context);
+        final isDarkMode = theme.brightness == Brightness.dark;
+        
         return GestureDetector(
           onTap: () async {
             final result = await custom.CustomDropdownMenu.show<T>(
@@ -157,7 +184,7 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
               borderRadius: BorderRadius.circular(4),
             ),
             child: Row(
@@ -165,10 +192,17 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
               children: [
                 Text(
                   items.firstWhere((item) => item.value == value).title,
-                  style: const TextStyle(fontSize: 14),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDarkMode ? Colors.white70 : Colors.black87,
+                  ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.arrow_drop_down, size: 18),
+                Icon(
+                  Icons.arrow_drop_down, 
+                  size: 18,
+                  color: isDarkMode ? Colors.white54 : Colors.black54,
+                ),
               ],
             ),
           ),
@@ -192,12 +226,22 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
     required String title,
     required Widget trailing,
   }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return ListTile(
-      leading: Icon(icon, color: Theme.of(context).primaryColor.withOpacity(0.7)),
+      leading: Icon(
+        icon, 
+        color: isDarkMode 
+            ? theme.colorScheme.primary.withOpacity(0.8)
+            : theme.primaryColor.withOpacity(0.7),
+        size: 22,
+      ),
       title: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
+          color: isDarkMode ? Colors.white : Colors.black87,
         ),
       ),
       trailing: trailing,
@@ -214,25 +258,35 @@ class _UserInterfaceCardState extends State<UserInterfaceCard> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return ListTile(
-      leading: Icon(icon, color: Theme.of(context).primaryColor.withOpacity(0.7)),
+      leading: Icon(
+        icon, 
+        color: isDarkMode 
+            ? theme.colorScheme.primary.withOpacity(0.8)
+            : theme.primaryColor.withOpacity(0.7),
+        size: 22,
+      ),
       title: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
+          color: isDarkMode ? Colors.white : Colors.black87,
         ),
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
           fontSize: 13,
-          color: Colors.grey[600],
+          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
         ),
       ),
       trailing: Switch.adaptive(
         value: value,
         onChanged: onChanged,
-        activeColor: Theme.of(context).primaryColor,
+        activeColor: theme.colorScheme.primary,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
     );

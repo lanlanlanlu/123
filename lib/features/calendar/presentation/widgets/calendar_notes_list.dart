@@ -49,22 +49,27 @@ class CalendarEmptyNotesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.inventory_2_outlined,
             size: 80,
-            color: Colors.grey,
+            color: theme.brightness == Brightness.dark 
+                ? Colors.grey[600] 
+                : Colors.grey[400],
           ),
           const SizedBox(height: 16),
           Text(
             s.calendarNoNotesOnDate(''),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
-              color: Colors.grey,
+              color: theme.brightness == Brightness.dark 
+                  ? Colors.grey[400] 
+                  : Colors.grey[600],
               fontWeight: FontWeight.w300,
             ),
           ),

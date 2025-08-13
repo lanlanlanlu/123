@@ -38,6 +38,7 @@ class HomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppLocalizations.of(context)!;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     // 【修改】移除了 Scaffold，只返回 body 内容
     return BlocConsumer<HomeBloc, HomeState>(
@@ -68,7 +69,15 @@ class HomeView extends StatelessWidget {
             ),
           );
         } else if (state is HomeLoadFailure) {
-          return Center(child: Text('${s.aiChatError}: ${state.message}'));
+          return Center(
+            child: Text(
+              '${s.aiChatError}: ${state.message}',
+              style: TextStyle(
+                color: isDarkMode ? Colors.red[300] : Colors.red,
+                fontSize: 16,
+              ),
+            ),
+          );
         }
         return const Center(child: CircularProgressIndicator());
       },

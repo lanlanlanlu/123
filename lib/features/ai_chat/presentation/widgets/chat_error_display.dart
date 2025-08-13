@@ -11,15 +11,20 @@ class ChatErrorDisplay extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(8.0),
-      color: Colors.red.shade50,
+      color: isDarkMode 
+          ? Color(0xFF4A1515) // 暗红色背景
+          : Colors.red.shade50,
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.error_outline,
-            color: Colors.red,
+            color: isDarkMode ? Colors.red[300] : Colors.red,
             size: 18,
           ),
           const SizedBox(width: 8),
@@ -27,15 +32,15 @@ class ChatErrorDisplay extends StatelessWidget {
             child: Text(
               error,
               style: TextStyle(
-                color: Colors.red.shade700,
+                color: isDarkMode ? Colors.red[200] : Colors.red.shade700,
                 fontSize: 12,
               ),
             ),
           ),
           IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.close,
-              color: Colors.red,
+              color: isDarkMode ? Colors.red[300] : Colors.red,
               size: 18,
             ),
             onPressed: () {

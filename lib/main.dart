@@ -21,6 +21,9 @@ import 'package:record_app/features/ai_chat/presentation/providers/model_provide
 import 'package:shared_preferences/shared_preferences.dart';
 // 导入自动生成的本地化类
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+// 导入主题相关类
+import 'package:record_app/app/theme/app_theme.dart';
+import 'package:record_app/app/theme/theme_cubit.dart';
 
 // 添加语言管理Cubit
 class LocaleCubit extends Cubit<Locale?> {
@@ -273,6 +276,10 @@ class _AppState extends State<App> with WidgetsBindingObserver {
           BlocProvider<LocaleCubit>(
             create: (context) => LocaleCubit(widget.initialLocale),
           ),
+          // 添加主题Cubit
+          BlocProvider<ThemeCubit>(
+            create: (context) => ThemeCubit()..initTheme(),
+          ),
           // 首页Bloc
           BlocProvider<HomeBloc>(
             create: (context) => HomeBloc(
@@ -310,53 +317,42 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 使用BlocBuilder监听语言变化
+    // 使用BlocBuilder监听语言和主题变化
     return BlocBuilder<LocaleCubit, Locale?>(
       builder: (context, locale) {
-        return MultiProvider(
-          providers: [
-            // 添加AI模型选择Provider
-            ChangeNotifierProvider<ModelProvider>(
-              create: (context) => ModelProvider(),
-            ),
-          ],
-          child: MaterialApp.router(
-            title: 'Record',
-            debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-              useMaterial3: true,
-              scaffoldBackgroundColor: const Color(0xFFF7F7F7), // 添加浅灰色背景
-              appBarTheme: const AppBarTheme(
-                elevation: 0,
-                backgroundColor: Color(0xFFF7F7F7),
-                foregroundColor: Colors.black,
-                titleTextStyle: TextStyle(
-                  color: Colors.black,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+        return BlocBuilder<ThemeCubit, ThemeState>(
+          builder: (context, themeState) {
+            // 根据主题模式获取相应的主题
+            final ThemeData lightTheme = AppTheme.getLightTheme();
+            final ThemeData darkTheme = AppTheme.getDarkTheme();
+            
+            return MultiProvider(
+              providers: [
+                // 添加AI模型选择Provider
+                ChangeNotifierProvider<ModelProvider>(
+                  create: (context) => ModelProvider(),
                 ),
+              ],
+              child: MaterialApp.router(
+                title: 'Record',
+                debugShowCheckedModeBanner: false,
+                theme: lightTheme,
+                darkTheme: darkTheme,
+                themeMode: themeState.themeMode,
+                // 使用自动生成的本地化委托
+                localizationsDelegates: [
+                  AppLocalizations.delegate,
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                supportedLocales: AppLocalizations.supportedLocales,
+                // 使用用户选择的语言或默认语言
+                locale: locale,
+                routerConfig: router,
               ),
-              cardTheme: CardTheme(
-                elevation: 0.5,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-              ),
-            ),
-            // 使用自动生成的本地化委托
-            localizationsDelegates: [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: AppLocalizations.supportedLocales,
-            // 使用用户选择的语言或默认语言
-            locale: locale,
-            routerConfig: router,
-          ),
+            );
+          },
         );
       },
     );

@@ -113,6 +113,8 @@ class _DropdownMenuWidget<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final menuPosition = _calculateMenuPosition(context);
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     
     return Stack(
       children: [
@@ -133,15 +135,22 @@ class _DropdownMenuWidget<T> extends StatelessWidget {
             child: Container(
               width: menuWidth,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
+                color: isDarkMode 
+                    ? const Color(0xFF2C2C2C).withOpacity(0.95) // 深色模式背景
+                    : Colors.white.withOpacity(0.95), // 浅色模式背景
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: isDarkMode
+                        ? Colors.black.withOpacity(0.3)
+                        : Colors.black.withOpacity(0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
+                border: isDarkMode
+                    ? Border.all(color: Colors.grey[800]!, width: 0.5)
+                    : null,
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
@@ -159,6 +168,7 @@ class _DropdownMenuWidget<T> extends StatelessWidget {
 
   // 构建菜单项列表
   List<Widget> _buildMenuItems(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final widgets = <Widget>[];
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
@@ -170,7 +180,11 @@ class _DropdownMenuWidget<T> extends StatelessWidget {
       
       // 添加分隔线，除了最后一项
       if (i != items.length - 1) {
-        widgets.add(const Divider(height: 0.5, thickness: 0.5, color: Color(0xFFD1D1D1)));
+        widgets.add(Divider(
+          height: 0.5, 
+          thickness: 0.5, 
+          color: isDarkMode ? const Color(0xFF3C3C3C) : const Color(0xFFD1D1D1),
+        ));
       }
     }
     return widgets;
@@ -192,12 +206,14 @@ class _MenuItemWidget<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isSelected = item.value == currentValue;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => Navigator.of(context).pop(item.value),
-        highlightColor: Colors.black12,
+        highlightColor: isDarkMode ? Colors.white12 : Colors.black12,
         splashColor: Colors.transparent,
         child: Container(
           height: height,
@@ -211,13 +227,17 @@ class _MenuItemWidget<T> extends StatelessWidget {
                   item.title,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.black87,
+                    color: isDarkMode ? Colors.white70 : Colors.black87,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ),
               if (isSelected)
-                const Icon(Icons.check, size: 16, color: Colors.blue),
+                Icon(
+                  Icons.check, 
+                  size: 16, 
+                  color: theme.colorScheme.primary,
+                ),
             ],
           ),
         ),

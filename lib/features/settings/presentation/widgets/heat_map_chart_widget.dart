@@ -48,27 +48,48 @@ class _HeatMapChartWidgetState extends State<HeatMapChartWidget> {
   @override
   Widget build(BuildContext context) {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     
     return BlocBuilder<SettingsHeatMapBloc, SettingsHeatMapState>(
       builder: (context, state) {
         if (state.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+            ),
+          );
         }
 
         if (state.error != null) {
           // ... 错误处理 ...
-          return Center(child: Text(state.error!));
+          return Center(
+            child: Text(
+              state.error!,
+              style: TextStyle(
+                color: isDarkMode ? Colors.red[300] : Colors.red,
+              ),
+            ),
+          );
         }
 
         if (state.heatMapData.isEmpty) {
           return Center(
-            child: Text(s.heatMapNoData),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                s.heatMapNoData,
+                style: TextStyle(
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+            ),
           );
         }
 
         final Map<DateTime, num> heatMapDataset = state.heatMapData.cast<DateTime, num>();
         
-        final theme = Theme.of(context);
         final currentYear = DateTime.now().year;
         final currentMonth = DateTime.now().month;
         final currentDay = DateTime.now().day;
@@ -76,6 +97,27 @@ class _HeatMapChartWidgetState extends State<HeatMapChartWidget> {
         // 仍然使用稳定的全年范围来渲染
         final stableStartDate = DateTime(currentYear - 1, 1, 1);
         final stableEndedDate = DateTime(currentYear, currentMonth, currentDay);
+        
+        // 根据当前主题模式选择合适的颜色
+        final primaryColor = theme.colorScheme.primary;
+        final colorMap = isDarkMode 
+            ? {
+                1: primaryColor.withOpacity(0.3),
+                3: primaryColor.withOpacity(0.5),
+                5: primaryColor.withOpacity(0.7),
+                7: primaryColor.withOpacity(0.85),
+                10: primaryColor,
+              }
+            : {
+                1: primaryColor.withOpacity(0.2),
+                3: primaryColor.withOpacity(0.4),
+                5: primaryColor.withOpacity(0.6),
+                7: primaryColor.withOpacity(0.8),
+                10: primaryColor,
+              };
+        
+        // 设置空单元格颜色
+        final emptyColor = isDarkMode ? Colors.grey[800] : Colors.grey[200];
         
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -86,23 +128,17 @@ class _HeatMapChartWidgetState extends State<HeatMapChartWidget> {
             
             selectedMap: heatMapDataset,
             
-            colorMap: {
-              1: theme.primaryColor.withValues(alpha: 0.2),
-              3: theme.primaryColor.withValues(alpha: 0.4),
-              5: theme.primaryColor.withValues(alpha: 0.6),
-              7: theme.primaryColor.withValues(alpha: 0.8),
-              10: theme.primaryColor,
-            },
+            colorMap: colorMap,
             
             cellSize: const Size.square(16.0),
             colorTipCellSize: const Size.square(12.0),
             
-            style: const HeatmapCalendarStyle.defaults(
-              // cellPadding: EdgeInsets.all(2.5), // 使用 padding 代替 margin
-              cellRadius: BorderRadius.all(Radius.circular(4.0)),
+            style: HeatmapCalendarStyle.defaults(
+              cellRadius: const BorderRadius.all(Radius.circular(4.0)),
               weekLabelValueFontSize: 10.0,
               monthLabelFontSize: 12.0,
-              // colorTipAlignBy: CalendarColorTipAlignBy.right,
+              // 注意：HeatmapCalendarStyle.defaults 不支持 defaultColor 和 textColor
+              // 我们可以通过自定义主题或其他方式解决
             ),
             
             layoutParameters: const HeatmapLayoutParameters.defaults(

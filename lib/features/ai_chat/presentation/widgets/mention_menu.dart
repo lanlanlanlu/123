@@ -486,6 +486,8 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.of(context).size;
     final EdgeInsets padding = MediaQuery.of(context).padding;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     
     // 使用CompositedTransformFollower将菜单附着在输入框上
     return CompositedTransformFollower(
@@ -506,11 +508,15 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           child: Container(
             width: widget.menuWidth,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
+              color: isDarkMode 
+                  ? theme.colorScheme.surface.withOpacity(0.95)
+                  : Colors.white.withOpacity(0.95),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: isDarkMode
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.black.withOpacity(0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -552,11 +558,17 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
                           decoration: InputDecoration(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             hintText: _getSearchHintText(),
-                            hintStyle: const TextStyle(fontSize: 14, color: Colors.black38),
+                            hintStyle: TextStyle(
+                              fontSize: 14, 
+                              color: isDarkMode ? Colors.grey[400] : Colors.black38
+                            ),
                             border: InputBorder.none,
                             isDense: true,
                           ),
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: theme.textTheme.bodyMedium?.color,
+                          ),
                           onSubmitted: (value) {
                             if (value.isNotEmpty) {
                               widget.controller.hide();
@@ -595,6 +607,9 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   // 构建主菜单内容
   Widget _buildMainMenuContent() {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Container(
       height: menuHeight,
       child: Column(
@@ -605,7 +620,12 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           if (_isLoadingMentions) ...[
             SizedBox(
               height: 2 * itemHeight, // 两个项目的高度
-              child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                )
+              ),
             ),
             _divider,
           ] else if (_recentMentions.isEmpty) ...[
@@ -650,12 +670,18 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   // 构建无最近提及项目的视图
   Widget _buildNoRecentMentionsView() {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return SizedBox(
       height: 2 * itemHeight, // 两个项目的高度，不包括多余的分隔线
       child: Center(
         child: Text(
           s.aiChatMentionNoRecentItems,
-          style: const TextStyle(fontSize: 14, color: Colors.black54),
+          style: TextStyle(
+            fontSize: 14, 
+            color: isDarkMode ? Colors.grey[400] : Colors.black54
+          ),
         ),
       ),
     );
@@ -664,6 +690,7 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   // 构建最近提及项目列表
   List<Widget> _buildRecentMentionsItems() {
     final List<Widget> items = [];
+    final theme = Theme.of(context);
     
     for (int i = 0; i < _recentMentions.length; i++) {
       final mention = _recentMentions[i];
@@ -719,17 +746,32 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   // 构建笔记列表内容
   Widget _buildNotesListContent() {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     if (_isLoading) {
       return SizedBox(
         height: menuHeight,
-        child: const Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+          )
+        ),
       );
     }
 
     if (_notes.isEmpty) {
       return SizedBox(
         height: menuHeight,
-        child: Center(child: Text(s.aiChatMentionNoNotes, style: const TextStyle(fontSize: 14, color: Colors.black54))),
+        child: Center(
+          child: Text(
+            s.aiChatMentionNoNotes, 
+            style: TextStyle(
+              fontSize: 14, 
+              color: isDarkMode ? Colors.grey[400] : Colors.black54
+            )
+          )
+        ),
       );
     }
     
@@ -765,6 +807,9 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
 
   // 构建单个笔记项
   Widget _buildNoteItem(Note note) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     // 截取标题，如果太长则显示省略号
     String title = note.title;
     if (title.length > 30) {
@@ -791,12 +836,19 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: Row(
             children: [
-              const Icon(Icons.description, size: 18, color: Colors.black54),
+              Icon(
+                Icons.description, 
+                size: 18, 
+                color: isDarkMode ? Colors.grey[400] : Colors.black54
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 14),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -813,6 +865,9 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
     required String title,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -821,12 +876,19 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: Colors.black54),
+              Icon(
+                icon, 
+                size: 18, 
+                color: isDarkMode ? Colors.grey[400] : Colors.black54
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 14),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -842,6 +904,9 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
     required String title,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -850,17 +915,24 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: Colors.black54),
+              Icon(
+                icon, 
+                size: 18, 
+                color: isDarkMode ? Colors.grey[400] : Colors.black54
+              ),
               const SizedBox(width: 12),
               Text(
                 title,
-                style: const TextStyle(fontSize: 14),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: theme.textTheme.bodyMedium?.color,
+                ),
               ),
               const Spacer(),
-              const Icon(
+              Icon(
                 Icons.arrow_forward_ios,
                 size: 14,
-                color: Colors.black38,
+                color: isDarkMode ? Colors.grey[500] : Colors.black38,
               ),
             ],
           ),
@@ -869,22 +941,46 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
     );
   }
 
-  Widget get _divider => const Divider(height: 1, thickness: 0.5, color: Color(0xFFEEEEEE));
+  Widget get _divider {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
+    return Divider(
+      height: 1, 
+      thickness: 0.5, 
+      color: isDarkMode ? Colors.grey[800] : const Color(0xFFEEEEEE)
+    );
+  }
 
   // 构建标签列表内容
   Widget _buildTagsListContent() {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     if (_isLoadingTags) {
       return SizedBox(
         height: menuHeight,
-        child: const Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+          )
+        ),
       );
     }
 
     if (_tags.isEmpty) {
       return SizedBox(
         height: menuHeight,
-        child: Center(child: Text(s.aiChatMentionNoTags, style: const TextStyle(fontSize: 14, color: Colors.black54))),
+        child: Center(
+          child: Text(
+            s.aiChatMentionNoTags, 
+            style: TextStyle(
+              fontSize: 14, 
+              color: isDarkMode ? Colors.grey[400] : Colors.black54
+            )
+          )
+        ),
       );
     }
     
@@ -920,6 +1016,9 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   
   // 构建单个标签项
   Widget _buildTagItem(Tag tag) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -940,12 +1039,19 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: Row(
             children: [
-              const Icon(Icons.label, size: 18, color: Colors.black54),
+              Icon(
+                Icons.label, 
+                size: 18, 
+                color: isDarkMode ? Colors.grey[400] : Colors.black54
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   tag.name,
-                  style: const TextStyle(fontSize: 14),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -959,17 +1065,32 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   // 构建地点列表内容
   Widget _buildLocationsListContent() {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     if (_isLoadingLocations) {
       return SizedBox(
         height: menuHeight,
-        child: const Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+          )
+        ),
       );
     }
 
     if (_locations.isEmpty) {
       return SizedBox(
         height: menuHeight,
-        child: Center(child: Text(s.aiChatMentionNoLocations, style: const TextStyle(fontSize: 14, color: Colors.black54))),
+        child: Center(
+          child: Text(
+            s.aiChatMentionNoLocations, 
+            style: TextStyle(
+              fontSize: 14, 
+              color: isDarkMode ? Colors.grey[400] : Colors.black54
+            )
+          )
+        ),
       );
     }
     
@@ -1005,6 +1126,9 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   
   // 构建单个地点项
   Widget _buildLocationItem(String location) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1025,12 +1149,19 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: Row(
             children: [
-              const Icon(Icons.location_on, size: 18, color: Colors.black54),
+              Icon(
+                Icons.location_on, 
+                size: 18, 
+                color: isDarkMode ? Colors.grey[400] : Colors.black54
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   location,
-                  style: const TextStyle(fontSize: 14),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1044,10 +1175,18 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
   // 构建搜索结果内容
   Widget _buildSearchResultsContent() {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     if (_isSearching) {
       return SizedBox(
         height: menuHeight,
-        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+          )
+        ),
       );
     }
 
@@ -1056,9 +1195,12 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
         height: menuHeight,
         child: Center(
           child: Text(
-            s.aiChatMentionNoSearchResults,
-            style: const TextStyle(fontSize: 14, color: Colors.black54),
-          ),
+            s.aiChatMentionNoSearchResults, 
+            style: TextStyle(
+              fontSize: 14, 
+              color: isDarkMode ? Colors.grey[400] : Colors.black54
+            )
+          )
         ),
       );
     }
@@ -1082,6 +1224,9 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
 
   // 构建单个搜索结果项
   Widget _buildSearchResultItem(SearchResultItem result) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     // 根据结果类型设置图标
     IconData icon;
     MentionType mentionType;
@@ -1124,7 +1269,11 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: Colors.black54),
+              Icon(
+                icon, 
+                size: 18, 
+                color: isDarkMode ? Colors.grey[400] : Colors.black54
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1133,13 +1282,19 @@ class _MentionMenuContentState extends State<_MentionMenuContent> {
                   children: [
                     Text(
                       result.title,
-                      style: const TextStyle(fontSize: 14),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (result.subtitle != null && result.subtitle!.isNotEmpty)
                       Text(
                         result.subtitle!,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(
+                          fontSize: 12, 
+                          color: isDarkMode ? Colors.grey[500] : Colors.grey,
+                        ),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                       ),

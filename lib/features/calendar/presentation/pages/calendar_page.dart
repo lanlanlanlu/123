@@ -33,7 +33,8 @@ class CalendarView extends StatelessWidget {
       builder: (context, state) {
         // 移除Scaffold，只保留body部分
         return Container(
-          color: Colors.grey[50], // 与AppBar保持一致的背景色
+          // 使用Theme的背景色，适应暗黑模式
+          color: Theme.of(context).scaffoldBackgroundColor,
           child: Column(
             children: [
               CalendarWidget(state: state),

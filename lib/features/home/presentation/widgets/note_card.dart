@@ -29,6 +29,9 @@ class NoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    
     return Slidable(
       key: Key(note.id.toString()),
       endActionPane: ActionPane(
@@ -61,10 +64,10 @@ class NoteCard extends StatelessWidget {
                 // 标题
                 Text(
                   note.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -81,7 +84,10 @@ class NoteCard extends StatelessWidget {
                         // 时间
                         Text(
                           note.createdAt.toYYMMDD(),
-                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                          style: TextStyle(
+                            fontSize: 10, 
+                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          ),
                         ),
                         // 位置信息
                         if (note.locationInfo != null && note.locationInfo!.isNotEmpty)
@@ -90,12 +96,19 @@ class NoteCard extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.location_on_outlined, size: 10, color: Colors.grey.shade600),
+                              Icon(
+                                Icons.location_on_outlined, 
+                                size: 10, 
+                                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                              ),
                               const SizedBox(width: 2), // 更小的间距
                               Flexible(
                                 child: Text(
                                   note.locationInfo!,
-                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                  style: TextStyle(
+                                    fontSize: 10, 
+                                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
                                 ),
@@ -109,7 +122,7 @@ class NoteCard extends StatelessWidget {
                   ),
                   
                   // 右侧笔记图片（如果有）
-                  _NoteImagePreview(noteId: note.id),
+                  _NoteImagePreview(noteId: note.id, isDarkMode: isDarkMode),
               ],
               ),
             ),
@@ -153,9 +166,11 @@ class NoteCard extends StatelessWidget {
 class _NoteImagePreview extends StatelessWidget {
   final int noteId;
   final double width;
+  final bool isDarkMode;
   
   const _NoteImagePreview({
     required this.noteId,
+    required this.isDarkMode,
     this.width = 70,
   });
   
@@ -198,10 +213,10 @@ class _NoteImagePreview extends StatelessWidget {
       width: width,
       errorBuilder: (context, error, stackTrace) {
         return Container(
-          color: Colors.grey.shade200,
+          color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
           child: Icon(
             Icons.broken_image,
-            color: Colors.grey.shade400,
+            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
           ),
         );
       },

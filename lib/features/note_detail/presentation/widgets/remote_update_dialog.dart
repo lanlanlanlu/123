@@ -37,17 +37,43 @@ class RemoteUpdateDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    
     return AlertDialog(
-      title: const Text('云端版本更新提示'),
+      backgroundColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+      title: Text(
+        '云端版本更新提示',
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black87,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('发现此笔记的云端版本更新于：$remoteUpdatedTime'),
+          Text(
+            '发现此笔记的云端版本更新于：$remoteUpdatedTime',
+            style: TextStyle(
+              color: isDarkMode ? Colors.grey[300] : Colors.grey[800],
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('笔记标题: $title'),
+          Text(
+            '笔记标题: $title',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 16),
-          const Text('您希望：'),
+          Text(
+            '您希望：',
+            style: TextStyle(
+              color: isDarkMode ? Colors.grey[300] : Colors.grey[800],
+            ),
+          ),
         ],
       ),
       actions: [
@@ -56,6 +82,9 @@ class RemoteUpdateDialog extends StatelessWidget {
             Navigator.of(context).pop(false);
             onReject();
           },
+          style: TextButton.styleFrom(
+            foregroundColor: isDarkMode ? Colors.grey[300] : Colors.grey[800],
+          ),
           child: const Text('保留本地版本'),
         ),
         ElevatedButton(
@@ -63,6 +92,10 @@ class RemoteUpdateDialog extends StatelessWidget {
             Navigator.of(context).pop(true);
             onAccept();
           },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isDarkMode ? theme.colorScheme.primary : null,
+            foregroundColor: isDarkMode ? Colors.white : null,
+          ),
           child: const Text('使用云端版本'),
         ),
       ],

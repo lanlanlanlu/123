@@ -8,12 +8,16 @@ class EmptyNotesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppLocalizations.of(context)!;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     return Center(
       child: Text(
         s.noteListEmptyDescription,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 18, color: Colors.grey),
+        style: TextStyle(
+          fontSize: 18, 
+          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+        ),
       ),
     );
   }

@@ -446,38 +446,48 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
           children: [
             // 标题输入框 - 在编辑模式下可以编辑，浏览模式下只显示
             widget.isEditing 
-                ? TextField(
-                    controller: widget.titleController,
-                    decoration: const InputDecoration(
-                      hintText: '标题',
-                      hintStyle: TextStyle(color: Colors.grey),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    style: const TextStyle(
-                      fontSize: 20, 
-                      fontWeight: FontWeight.bold,
-                      height: 1.5,
-                      color: Colors.black87,
-                    ),
-                    onChanged: (value) {
-                      // 使用防抖处理标题更新，避免频繁触发
-                      _debounce(() {
-                        widget.onTitleChanged(value);
-                      });
-                    },
+                ? Builder(
+                    builder: (context) {
+                      final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                      return TextField(
+                        controller: widget.titleController,
+                        decoration: InputDecoration(
+                          hintText: '标题',
+                          hintStyle: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        style: TextStyle(
+                          fontSize: 20, 
+                          fontWeight: FontWeight.bold,
+                          height: 1.5,
+                          color: isDarkMode ? Colors.white : Colors.black87,
+                        ),
+                        onChanged: (value) {
+                          // 使用防抖处理标题更新，避免频繁触发
+                          _debounce(() {
+                            widget.onTitleChanged(value);
+                          });
+                        },
+                      );
+                    }
                   )
-                : Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Text(
-                      widget.titleController.text.isEmpty ? '无标题' : widget.titleController.text,
-                      style: const TextStyle(
-                        fontSize: 20, 
-                        fontWeight: FontWeight.bold,
-                        height: 1.5,
-                        color: Colors.black87,
-                      ),
-                    ),
+                : Builder(
+                    builder: (context) {
+                      final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Text(
+                          widget.titleController.text.isEmpty ? '无标题' : widget.titleController.text,
+                          style: TextStyle(
+                            fontSize: 20, 
+                            fontWeight: FontWeight.bold,
+                            height: 1.5,
+                            color: isDarkMode ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      );
+                    }
                   ),
             
             // 字数统计和标签显示栏
@@ -494,24 +504,43 @@ class _QuillEditorWidgetState extends State<QuillEditorWidget> {
             // 编辑器区域 - 根据模式切换readOnly状态
             Stack(
               children: [
-                QuillEditor.basic(
-                  controller: _controller,
-                  focusNode: _editorFocusNode,
-                  config: QuillEditorConfig(
-                    placeholder: widget.isEditing ? '开始输入...' : '',
-                    scrollable: false,
-                    autoFocus: widget.isEditing,
-                    expands: false,
-                    padding: EdgeInsets.zero,
-                    embedBuilders: [
-                      CustomImageEmbedBuilder(), 
-                      CustomVideoEmbedBuilder(),
-                      AudioRecordingEmbedBuilder(),
-                    ],
-                    detectWordBoundary: true,
-                    enableSelectionToolbar: widget.isEditing,
-                    showCursor: widget.isEditing,
-                  ),
+                Builder(
+                  builder: (context) {
+                    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                    
+                    // 使用Theme来覆盖文本颜色
+                    return Theme(
+                      // 在暗黑模式下覆盖文本颜色为白色
+                      data: Theme.of(context).copyWith(
+                        textTheme: Theme.of(context).textTheme.apply(
+                          bodyColor: isDarkMode ? Colors.white : Colors.black87,
+                          displayColor: isDarkMode ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      child: Container(
+                        color: Colors.transparent,
+                        child: QuillEditor.basic(
+                          controller: _controller,
+                          focusNode: _editorFocusNode,
+                          config: QuillEditorConfig(
+                            placeholder: widget.isEditing ? '开始输入...' : '',
+                            scrollable: false,
+                            autoFocus: widget.isEditing,
+                            expands: false,
+                            padding: EdgeInsets.zero,
+                            embedBuilders: [
+                              CustomImageEmbedBuilder(), 
+                              CustomVideoEmbedBuilder(),
+                              AudioRecordingEmbedBuilder(),
+                            ],
+                            detectWordBoundary: true,
+                            enableSelectionToolbar: widget.isEditing,
+                            showCursor: widget.isEditing,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
                 ),
                 if (!widget.isEditing && widget.onTapToEdit != null)
                   Positioned.fill(

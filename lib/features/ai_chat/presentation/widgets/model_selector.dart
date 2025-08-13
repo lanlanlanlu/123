@@ -82,6 +82,9 @@ class ModelSelector extends StatelessWidget {
 
   /// 显示模型选择对话框
   Future<void> _showModelSelectionDialog(BuildContext context) async {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     final AiModel? result = await showDialog<AiModel>(
       context: context,
       builder: (context) => AlertDialog(
@@ -92,9 +95,19 @@ class ModelSelector extends StatelessWidget {
             children: AiModel.values.map((model) {
               return ListTile(
                 title: Text(model.displayName),
-                subtitle: Text(model.technicalName),
+                subtitle: Text(
+                  model.technicalName,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
                 selected: model == currentModel,
-                trailing: model == currentModel ? const Icon(Icons.check) : null,
+                trailing: model == currentModel 
+                    ? Icon(
+                        Icons.check, 
+                        color: theme.colorScheme.primary,
+                      ) 
+                    : null,
                 onTap: () {
                   Navigator.of(context).pop(model);
                 },

@@ -16,6 +16,8 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
   @override
   Widget build(BuildContext context) {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -31,9 +33,10 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
             padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 16.0, bottom: 8.0),
             child: Text(
               s.settingsDataAndSecurity,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
               ),
             ),
           ),
@@ -105,18 +108,28 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return ListTile(
-      leading: Icon(icon, color: Theme.of(context).primaryColor.withOpacity(0.7)),
+      leading: Icon(
+        icon, 
+        color: isDarkMode 
+            ? theme.colorScheme.primary.withOpacity(0.8)
+            : theme.primaryColor.withOpacity(0.7),
+        size: 22,
+      ),
       title: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
+          color: isDarkMode ? Colors.white : Colors.black87,
         ),
       ),
       trailing: Switch.adaptive(
         value: value,
         onChanged: onChanged,
-        activeColor: Theme.of(context).primaryColor,
+        activeColor: theme.colorScheme.primary,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
     );
@@ -129,15 +142,29 @@ class _DataSecurityCardState extends State<DataSecurityCard> {
     required String title,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return ListTile(
-      leading: Icon(icon, color: Theme.of(context).primaryColor.withOpacity(0.7)),
+      leading: Icon(
+        icon, 
+        color: isDarkMode 
+            ? theme.colorScheme.primary.withOpacity(0.8)
+            : theme.primaryColor.withOpacity(0.7),
+        size: 22,
+      ),
       title: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
+          color: isDarkMode ? Colors.white : Colors.black87,
         ),
       ),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: isDarkMode ? Colors.white54 : Colors.black54,
+        size: 20,
+      ),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
     );

@@ -273,12 +273,14 @@ class CalendarContent extends StatelessWidget {
 
 /// 日历页面的AppBar
 class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
-  @override
+  
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
   Widget build(BuildContext context) {
     final s = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     
     return BlocBuilder<CalendarBloc, CalendarState>(
       builder: (context, state) {
@@ -294,7 +296,7 @@ class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
 
         return AppBar(
           automaticallyImplyLeading: false,
-          backgroundColor: Colors.grey[50],
+          backgroundColor: theme.scaffoldBackgroundColor,
           elevation: 0,
           titleSpacing: 16.0,
           title: Row(
@@ -305,10 +307,10 @@ class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
                 locale == 'zh'
                     ? '${selectedDate.month}月${selectedDate.day}日'
                     : '${selectedDate.month}/${selectedDate.day}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w400,
-                  color: Colors.black,
+                  color: theme.textTheme.titleLarge?.color,
                 ),
               ),
               const SizedBox(width: 4),
@@ -320,10 +322,10 @@ class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
                   // 上半部分：年份
                   Text(
                     '${selectedDate.year}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.normal,
-                      color: Colors.black87,
+                      color: theme.textTheme.bodyLarge?.color,
                     ),
                   ),
                   // 下半部分：周几
@@ -332,7 +334,7 @@ class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.normal,
-                      color: Colors.grey[700],
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
                     ),
                   ),
                 ],
@@ -343,7 +345,10 @@ class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!, width: 1),
+                  border: Border.all(
+                    color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!, 
+                    width: 1
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Material(
@@ -356,10 +361,10 @@ class CalendarAppBar extends StatelessWidget implements PreferredSizeWidget {
                     child: Center(
                       child: Text(
                         '${now.day}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: theme.textTheme.bodyLarge?.color,
                         ),
                       ),
                     ),

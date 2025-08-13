@@ -299,8 +299,11 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
           _lastMessageCount = state.messages.length;
         },
         builder: (context, state) {
+          final theme = Theme.of(context);
+          final isDarkMode = theme.brightness == Brightness.dark;
+          
           return Material(
-            color: Colors.grey[50], // 浅灰色背景，类似图片中的背景色
+            color: theme.scaffoldBackgroundColor,
             child: Column(
               children: [
                 // 错误提示（如果有）
@@ -331,14 +334,16 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                 ),
                                 padding: const EdgeInsets.all(12.0),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey[200],
+                                  color: isDarkMode 
+                                      ? theme.colorScheme.surfaceVariant.withOpacity(0.7)
+                                      : Colors.grey[200],
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
                                   message.text,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.black87,
+                                    color: theme.textTheme.bodyMedium?.color,
                                   ),
                                 ),
                               ),
@@ -348,7 +353,7 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                   DateFormat('HH:mm').format(message.createdAt),
                                   style: TextStyle(
                                     fontSize: 10,
-                                    color: Colors.grey[600],
+                                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                   ),
                                 ),
                               ),
@@ -365,11 +370,13 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                           children: [
                             Container(
                               constraints: BoxConstraints(
-                                maxWidth: MediaQuery.of(context).size.width * 0.8, // 修改为占屏幕宽度的4/5
+                                maxWidth: MediaQuery.of(context).size.width * 0.8,
                               ),
                               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                               decoration: BoxDecoration(
-                                color: Colors.grey[200],
+                                color: isDarkMode 
+                                    ? theme.colorScheme.primary.withOpacity(0.2)
+                                    : Colors.grey[200],
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Column(
@@ -391,9 +398,16 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                             return Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                                               decoration: BoxDecoration(
-                                                color: Colors.grey[100],
+                                                color: isDarkMode
+                                                    ? theme.colorScheme.surface
+                                                    : Colors.grey[100],
                                                 borderRadius: BorderRadius.circular(16),
-                                                border: Border.all(color: Colors.grey.withOpacity(0.3), width: 0.5),
+                                                border: Border.all(
+                                                  color: isDarkMode
+                                                      ? Colors.grey.withOpacity(0.5)
+                                                      : Colors.grey.withOpacity(0.3),
+                                                  width: 0.5
+                                                ),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
@@ -401,15 +415,15 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                                   Icon(
                                                     _getIconForMentionType(mentionType),
                                                     size: 14,
-                                                    color: Theme.of(context).primaryColor,
+                                                    color: theme.colorScheme.primary,
                                                   ),
                                                   const SizedBox(width: 4),
                                                   Text(
                                                     item['title'] as String,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontSize: 12,
                                                       height: 1.0,
-                                                      color: Colors.black87,
+                                                      color: theme.textTheme.bodyMedium?.color,
                                                     ),
                                                   ),
                                                 ],
@@ -423,9 +437,9 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                   // 消息文本
                                   Text(
                                     message.text,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
-                                      color: Colors.black87,
+                                      color: theme.textTheme.bodyMedium?.color,
                                     ),
                                   ),
                                 ],
@@ -437,7 +451,7 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                 DateFormat('HH:mm').format(message.createdAt),
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: Colors.grey[600],
+                                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                 ),
                               ),
                             ),
@@ -453,17 +467,21 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                   padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDarkMode ? theme.colorScheme.surface : Colors.white,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: isDarkMode
+                              ? Colors.black.withOpacity(0.2)
+                              : Colors.black.withOpacity(0.05),
                           blurRadius: 4,
                           offset: const Offset(0, 1),
                         )
                       ],
                       border: Border.all(
-                        color: Colors.grey.withOpacity(0.15),
+                        color: isDarkMode
+                            ? Colors.grey.withOpacity(0.3)
+                            : Colors.grey.withOpacity(0.15),
                         width: 0.5,
                       ),
                     ),
@@ -487,18 +505,27 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                     avatar: Icon(
                                       _getIconForMentionType(item.type),
                                       size: 14,
-                                      color: Theme.of(context).primaryColor,
+                                      color: theme.colorScheme.primary,
                                     ),
                                     label: Text(
                                       item.title,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 12,
                                         height: 1.0,
+                                        color: theme.textTheme.bodyMedium?.color,
                                       ),
                                     ),
                                     labelPadding: EdgeInsets.zero,
-                                    backgroundColor: Colors.grey[100],
-                                    deleteIcon: const Icon(Icons.close, size: 12),
+                                    backgroundColor: isDarkMode
+                                        ? theme.colorScheme.surfaceVariant
+                                        : Colors.grey[100],
+                                    deleteIcon: Icon(
+                                      Icons.close, 
+                                      size: 12,
+                                      color: isDarkMode
+                                          ? Colors.grey[300]
+                                          : Colors.grey[700],
+                                    ),
                                     onDeleted: () => _removeMentionItem(item),
                                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
@@ -521,14 +548,15 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                 focusNode: _focusNode,
                                 minLines: 1,
                                 maxLines: 5, // 允许自动扩展到最多5行
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
                                   height: 1.3,
+                                  color: theme.textTheme.bodyMedium?.color,
                                 ),
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   hintText: 'Ask me notes or anything',
                                   hintStyle: TextStyle(
-                                    color: Colors.black45,
+                                    color: isDarkMode ? Colors.grey[400] : Colors.black45,
                                     fontSize: 16,
                                     height: 1.3,
                                   ),
@@ -555,12 +583,12 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                             children: [
                               // @按钮
                               IconButton(
-                                icon: const Text(
+                                icon: Text(
                                   '@',
                                   style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black54,
+                                    color: isDarkMode ? Colors.grey[300] : Colors.black54,
                                   ),
                                 ),
                                 onPressed: _showMentionMenu,
@@ -578,13 +606,17 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                                 height: 40,
                                 width: 40,
                                 decoration: BoxDecoration(
-                                  color: Colors.grey[200],
+                                  color: isDarkMode 
+                                      ? theme.colorScheme.surfaceVariant
+                                      : Colors.grey[200],
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: IconButton(
                                   icon: Icon(
                                     Icons.arrow_forward,
-                                    color: state.isLoading ? Colors.grey : Colors.black,
+                                    color: state.isLoading 
+                                        ? (isDarkMode ? Colors.grey[600] : Colors.grey)
+                                        : (isDarkMode ? theme.colorScheme.onSurface : Colors.black),
                                     size: 22,
                                   ),
                                   onPressed: state.isLoading
@@ -650,9 +682,16 @@ class _AiChatPageState extends State<AiChatPage> with WidgetsBindingObserver {
                 
                 // 底部加载指示器
                 if (state.isLoading)
-                  const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: LinearProgressIndicator(),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: LinearProgressIndicator(
+                      backgroundColor: isDarkMode 
+                          ? Colors.grey[800] 
+                          : Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        theme.colorScheme.primary,
+                      ),
+                    ),
                   ),
               ],
             ),

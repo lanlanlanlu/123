@@ -56,51 +56,60 @@ class StatsAndTagsBar extends StatelessWidget {
 
   // 构建阅读模式下的字数统计和标签显示栏（从数据库获取标签）
   Widget _buildReadModeStats(AppDatabase database, int wordCount, int noteId) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // 字数统计
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            '$wordCount 字',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // 标签显示 - 从数据库中获取
-        Expanded(
-          child: StreamBuilder<List<Tag>>(
-            stream: database.noteDao.watchTagsForNote(noteId),
-            builder: (context, snapshot) {
-              final tags = snapshot.data ?? [];
-              
-              if (tags.isEmpty) return const SizedBox.shrink();
-              
-              return SizedBox(
-                height: 22,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: tags.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 6),
-                  itemBuilder: (context, index) {
-                    return _buildTagChip(
-                      context,
-                      tags[index].name,
-                      isActive: true,
-                      showDeleteButton: false,
-                    );
-                  },
+    return Builder(
+      builder: (context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 字数统计
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$wordCount 字',
+                style: TextStyle(
+                  fontSize: 11, 
+                  color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade600
                 ),
-              );
-            },
-          ),
-        ),
-      ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 标签显示 - 从数据库中获取
+            Expanded(
+              child: StreamBuilder<List<Tag>>(
+                stream: database.noteDao.watchTagsForNote(noteId),
+                builder: (context, snapshot) {
+                  final tags = snapshot.data ?? [];
+                  
+                  if (tags.isEmpty) return const SizedBox.shrink();
+                  
+                  return SizedBox(
+                    height: 22,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: tags.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 6),
+                      itemBuilder: (context, index) {
+                        return _buildTagChip(
+                          context,
+                          tags[index].name,
+                          isActive: true,
+                          showDeleteButton: false,
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      }
     );
   }
 
@@ -109,59 +118,68 @@ class StatsAndTagsBar extends StatelessWidget {
     // 从当前编辑内容中提取的标签
     final extractedTags = _extractTags(content);
     
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // 字数统计
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            '$wordCount 字',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // 标签显示 - 合并当前编辑内容中的标签和数据库中的标签
-        Expanded(
-          child: StreamBuilder<List<Tag>>(
-            stream: database.noteDao.watchTagsForNote(noteId),
-            builder: (context, snapshot) {
-              // 获取数据库中的标签
-              final dbTags = snapshot.data ?? [];
-              final dbTagNames = dbTags.map((tag) => tag.name).toSet();
-              
-              // 合并数据库标签和提取的标签，确保不重复
-              final allTags = <String>{...dbTagNames, ...extractedTags}.toList();
-              
-              if (allTags.isEmpty) return const SizedBox.shrink();
-              
-              return SizedBox(
-                height: 22,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: allTags.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 6),
-                  itemBuilder: (context, index) {
-                    final tagName = allTags[index];
-                    final bool isInCurrentText = extractedTags.contains(tagName);
-                    
-                    return _buildTagChip(
-                      context,
-                      tagName,
-                      isActive: isInCurrentText,
-                      showDeleteButton: isEditing,
-                    );
-                  },
+    return Builder(
+      builder: (context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 字数统计
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$wordCount 字',
+                style: TextStyle(
+                  fontSize: 11, 
+                  color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade600
                 ),
-              );
-            },
-          ),
-        ),
-      ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 标签显示 - 合并当前编辑内容中的标签和数据库中的标签
+            Expanded(
+              child: StreamBuilder<List<Tag>>(
+                stream: database.noteDao.watchTagsForNote(noteId),
+                builder: (context, snapshot) {
+                  // 获取数据库中的标签
+                  final dbTags = snapshot.data ?? [];
+                  final dbTagNames = dbTags.map((tag) => tag.name).toSet();
+                  
+                  // 合并数据库标签和提取的标签，确保不重复
+                  final allTags = <String>{...dbTagNames, ...extractedTags}.toList();
+                  
+                  if (allTags.isEmpty) return const SizedBox.shrink();
+                  
+                  return SizedBox(
+                    height: 22,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: allTags.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 6),
+                      itemBuilder: (context, index) {
+                        final tagName = allTags[index];
+                        final bool isInCurrentText = extractedTags.contains(tagName);
+                        
+                        return _buildTagChip(
+                          context,
+                          tagName,
+                          isActive: isInCurrentText,
+                          showDeleteButton: isEditing,
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      }
     );
   }
 
@@ -170,44 +188,53 @@ class StatsAndTagsBar extends StatelessWidget {
     // 从当前编辑内容中提取标签
     final extractedTags = _extractTags(content);
     
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // 字数统计
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            '$wordCount 字',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // 标签显示 - 针对编辑和预览模式，使用从当前内容中提取的标签
-        if (extractedTags.isNotEmpty)
-          Expanded(
-            child: SizedBox(
-              height: 22,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: extractedTags.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 6),
-                itemBuilder: (context, index) {
-                  final tagName = extractedTags[index];
-                  return _buildTagChip(
-                    context,
-                    tagName,
-                    isActive: true,
-                    showDeleteButton: isEditing,
-                  );
-                },
+    return Builder(
+      builder: (context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 字数统计
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$wordCount 字',
+                style: TextStyle(
+                  fontSize: 11, 
+                  color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade600
+                ),
               ),
             ),
-          ),
-      ],
+            const SizedBox(width: 8),
+            // 标签显示 - 针对编辑和预览模式，使用从当前内容中提取的标签
+            if (extractedTags.isNotEmpty)
+              Expanded(
+                child: SizedBox(
+                  height: 22,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: extractedTags.length,
+                    separatorBuilder: (context, index) => const SizedBox(width: 6),
+                    itemBuilder: (context, index) {
+                      final tagName = extractedTags[index];
+                      return _buildTagChip(
+                        context,
+                        tagName,
+                        isActive: true,
+                        showDeleteButton: isEditing,
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ],
+        );
+      }
     );
   }
   
@@ -219,9 +246,16 @@ class StatsAndTagsBar extends StatelessWidget {
     required bool showDeleteButton,
   }) {
     final theme = Theme.of(context);
-    final primaryColor = theme.primaryColor;
-    final tagColor = isActive ? primaryColor.withOpacity(0.1) : Colors.grey.shade100;
-    final textColor = isActive ? primaryColor : Colors.grey.shade600;
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
+    
+    final tagColor = isActive 
+        ? (isDarkMode ? primaryColor.withOpacity(0.2) : primaryColor.withOpacity(0.1))
+        : (isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100);
+    
+    final textColor = isActive 
+        ? (isDarkMode ? primaryColor.withOpacity(0.9) : primaryColor) 
+        : (isDarkMode ? Colors.grey.shade300 : Colors.grey.shade600);
     
     return Container(
       height: 22,
@@ -232,10 +266,15 @@ class StatsAndTagsBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: tagColor,
         borderRadius: BorderRadius.circular(11),
-        border: isActive ? null : Border.all(color: Colors.grey.shade300, width: 0.5),
+        border: isActive 
+            ? null 
+            : Border.all(
+                color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300, 
+                width: 0.5
+              ),
         boxShadow: isActive ? [
           BoxShadow(
-            color: primaryColor.withOpacity(0.1),
+            color: primaryColor.withOpacity(isDarkMode ? 0.2 : 0.1),
             blurRadius: 2,
             offset: const Offset(0, 1),
           ),
@@ -263,7 +302,7 @@ class StatsAndTagsBar extends StatelessWidget {
               child: Container(
                 margin: const EdgeInsets.only(left: 2),
                 padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.transparent,
                   shape: BoxShape.circle,
                 ),

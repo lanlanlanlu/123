@@ -12,14 +12,28 @@ class StatsSummaryCard extends StatelessWidget {
     return BlocBuilder<SettingsStatsBloc, SettingsStatsState>(
       builder: (context, state) {
         if (state.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
+            ),
+          );
         }
 
         if (state.error != null) {
-          return Center(child: Text(state.error!));
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          return Center(
+            child: Text(
+              state.error!,
+              style: TextStyle(
+                color: isDarkMode ? Colors.red[300] : Colors.red,
+              ),
+            ),
+          );
         }
 
         final s = AppLocalizations.of(context)!;
+        final theme = Theme.of(context);
+        final isDarkMode = theme.brightness == Brightness.dark;
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -68,6 +82,9 @@ class StatsSummaryCard extends StatelessWidget {
   }
   
   Widget _buildStatItem(BuildContext context, String value, String label) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -76,7 +93,7 @@ class StatsSummaryCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).primaryColor,
+            color: theme.colorScheme.primary,
           ),
         ),
         const SizedBox(height: 4),
@@ -84,7 +101,7 @@ class StatsSummaryCard extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey[600],
+            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
           ),
         ),
       ],

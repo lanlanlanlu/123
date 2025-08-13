@@ -55,7 +55,7 @@
       }
     }
   },
-  "calendarNoNotesOnDate": "No notes on {date}",
+  "calendarNoNotesOnDate": "No notes~",
   "@calendarNoNotesOnDate": {
     "placeholders": {
       "date": {

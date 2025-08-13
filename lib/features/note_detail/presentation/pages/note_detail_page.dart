@@ -438,19 +438,29 @@ class _NoteDetailViewState extends State<NoteDetailView> {
           );
         } else {
           // 处理错误状态
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          
           return Scaffold(
             appBar: AppBar(title: const Text('笔记详情')),
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  Icon(
+                    Icons.error_outline, 
+                    size: 48, 
+                    color: isDarkMode ? Colors.red[300] : Colors.red,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     state is NoteDetailLoadFailure
                         ? state.message
                         : '未知错误',
-                    style: const TextStyle(color: Colors.red),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.red[300] : Colors.red,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
@@ -458,6 +468,10 @@ class _NoteDetailViewState extends State<NoteDetailView> {
                       // 重新加载笔记
                       context.read<NoteDetailBloc>().add(NoteDetailLoadNote(widget.initialNote.id));
                     },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDarkMode ? Theme.of(context).colorScheme.primary : null,
+                      foregroundColor: isDarkMode ? Colors.white : null,
+                    ),
                     child: const Text('重试'),
                   ),
                 ],
@@ -583,16 +597,33 @@ class _NoteDetailViewState extends State<NoteDetailView> {
     Share.share(content);
   }
 
-  // 添加确认删除方法
+  // 修改确认删除对话框
   void _showDeleteConfirmation(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除笔记'),
-        content: const Text('确定要删除此笔记吗？此操作无法撤销。'),
+        backgroundColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+        title: Text(
+          '删除笔记',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          '确定要删除此笔记吗？此操作无法撤销。',
+          style: TextStyle(
+            color: isDarkMode ? Colors.grey[300] : Colors.grey[800],
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: isDarkMode ? Colors.grey[300] : Colors.grey[800],
+            ),
             child: const Text('取消'),
           ),
           TextButton(
@@ -601,7 +632,10 @@ class _NoteDetailViewState extends State<NoteDetailView> {
               context.read<NoteDetailBloc>().add(const NoteDetailDeleteNote());
               context.pop();
             },
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('删除'),
           ),
         ],
       ),
