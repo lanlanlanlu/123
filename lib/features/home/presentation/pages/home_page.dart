@@ -11,6 +11,7 @@ import 'package:record_app/features/home/presentation/bloc/home_event.dart';
 import 'package:record_app/features/home/presentation/bloc/home_state.dart';
 import 'package:record_app/features/home/presentation/widgets/empty_notes_view.dart';
 import 'package:record_app/features/home/presentation/widgets/note_card.dart';
+import 'package:record_app/features/home/presentation/widgets/note_list.dart';
 
 /// 首页，显示所有笔记列表
 class HomePage extends StatelessWidget {
@@ -33,7 +34,7 @@ class HomePage extends StatelessWidget {
 
 /// 首页视图
 class HomeView extends StatelessWidget {
-  const HomeView({super.key});
+  const HomeView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -43,43 +44,56 @@ class HomeView extends StatelessWidget {
     // 【修改】移除了 Scaffold，只返回 body 内容
     return BlocConsumer<HomeBloc, HomeState>(
       listener: (context, state) {
+        // 处理操作成功消息
         if (state is HomeOperationSuccess) {
+          // 根据消息类型获取本地化字符串
+          String localizedMessage;
+          switch (state.message) {
+            case 'NOTE_DELETED':
+              localizedMessage = s.noteDeleted;
+              break;
+            case 'NOTE_RESTORED':
+              localizedMessage = s.noteDetailRestore;
+              break;
+            default:
+              localizedMessage = state.message;
+          }
+          
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
+            SnackBar(content: Text(localizedMessage)),
           );
-        } else if (state is HomeLoadFailure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
+          
+          // 操作成功后重新加载笔记
+          context.read<HomeBloc>().add(const HomeLoadNotes());
         }
       },
       builder: (context, state) {
+        // 调试输出当前排序状态
+        if (state is HomeLoadSuccess) {
+          print('当前排序状态: 类型=${state.sortType}, 顺序=${state.sortOrder}');
+        }
+        
         if (state is HomeLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is HomeLoadSuccess) {
           if (state.notes.isEmpty) {
             return const EmptyNotesView();
           }
-          return ListView.builder(
-            itemCount: state.notes.length,
-            itemBuilder: (context, index) => NoteCard(
-              note: state.notes[index],
-              onDelete: (noteId) => context.read<HomeBloc>().add(HomeNoteDeleted(noteId)),
-              onRestore: (noteId) => context.read<HomeBloc>().add(HomeNoteRestored(noteId)),
-            ),
-          );
+          return NoteList(notes: state.notes);
         } else if (state is HomeLoadFailure) {
-          return Center(
-            child: Text(
-              '${s.aiChatError}: ${state.message}',
-              style: TextStyle(
-                color: isDarkMode ? Colors.red[300] : Colors.red,
-                fontSize: 16,
-              ),
-            ),
-          );
+          // 根据错误消息类型获取本地化字符串
+          String localizedError;
+          if (state.message.startsWith('ERROR_DELETE_NOTE')) {
+            localizedError = s.noteDetailDeleteConfirmation;
+          } else if (state.message.startsWith('ERROR_RESTORE_NOTE')) {
+            localizedError = '${s.noteDetailRestore} ${s.aiChatError}';
+          } else {
+            localizedError = state.message;
+          }
+          return Center(child: Text(localizedError));
+        } else {
+          return const Center(child: CircularProgressIndicator());
         }
-        return const Center(child: CircularProgressIndicator());
       },
     );
   }

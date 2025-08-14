@@ -206,5 +206,11 @@
   "authBiometricRequired": "Biometric authentication required",
   "authBiometricEnable": "Enable biometric authentication",
   "authBiometricDisable": "Disable biometric authentication",
-  "authBiometricNotSupported": "Your device doesn't support biometric authentication"
+  "authBiometricNotSupported": "Your device doesn't support biometric authentication",
+  
+  "sortOrderTitle": "Sort Notes",
+  "sortByUpdatedTimeDesc": "Updated Time (Newest First)",
+  "sortByUpdatedTimeAsc": "Updated Time (Oldest First)",
+  "sortByCreatedTimeDesc": "Created Time (Newest First)",
+  "sortByCreatedTimeAsc": "Created Time (Oldest First)"
 } 

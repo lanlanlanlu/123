@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart'; // 添加Provider导入
+import 'package:provider/provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:record_app/data/repository/repository.dart';
+import 'package:record_app/data/repository/ai_chat_repository.dart';
 import 'package:record_app/features/calendar/presentation/pages/calendar_page.dart';
-import 'package:record_app/features/home/presentation/pages/home_page.dart';
-import 'package:record_app/features/ai_chat/presentation/pages/ai_chat_content.dart';
-import 'package:record_app/features/ai_chat/presentation/widgets/ai_chat_app_bar.dart';
-import 'package:record_app/features/main_shell/presentation/bloc/main_shell_cubit.dart';
-import 'package:record_app/features/settings/presentation/pages/settings_page.dart';
-import 'package:record_app/features/main_shell/presentation/widgets/bottom_nav_bar.dart';
-import 'package:record_app/features/main_shell/presentation/widgets/input_sheet_overlay.dart';
-import 'package:record_app/features/home/presentation/bloc/app_bar_bloc.dart';
-import 'package:record_app/features/home/presentation/bloc/home_bloc.dart';
-import 'package:record_app/features/home/presentation/bloc/home_event.dart';
 import 'package:record_app/features/calendar/presentation/bloc/calendar_bloc.dart';
 import 'package:record_app/features/calendar/presentation/bloc/calendar_event.dart';
 import 'package:record_app/features/calendar/presentation/bloc/calendar_state.dart';
-import 'package:record_app/data/repository/notes_repository.dart';
-import 'package:record_app/data/repository/repository.dart';
-import 'package:record_app/data/repository/ai_chat_repository.dart'; // 导入AiChatRepository
+import 'package:record_app/features/home/presentation/bloc/app_bar_bloc.dart';
+import 'package:record_app/features/home/presentation/bloc/home_bloc.dart';
+import 'package:record_app/features/home/presentation/bloc/home_event.dart';
+import 'package:record_app/features/home/presentation/bloc/home_state.dart';
+import 'package:record_app/features/home/presentation/pages/home_page.dart';
+import 'package:record_app/features/ai_chat/presentation/pages/chat_history_list_page.dart';
+import 'package:record_app/features/ai_chat/presentation/pages/ai_chat_content.dart';
+import 'package:record_app/features/ai_chat/presentation/widgets/ai_chat_app_bar.dart';
+import 'package:record_app/features/main_shell/presentation/bloc/main_shell_cubit.dart';
+import 'package:record_app/features/main_shell/presentation/bloc/note_input_cubit.dart';
+import 'package:record_app/features/main_shell/presentation/widgets/bottom_nav_bar.dart';
+import 'package:record_app/features/main_shell/presentation/widgets/input_sheet_overlay.dart';
+import 'package:record_app/features/main_shell/presentation/widgets/note_input_sheet.dart';
+import 'package:record_app/features/settings/presentation/pages/settings_page.dart';
 
 /// 草稿键值常量
 const String DRAFT_KEY = 'note_draft';
@@ -41,6 +44,8 @@ class _MainShellPageState extends State<MainShellPage> {
   late final CalendarBloc _calendarBloc;
   // 添加AI聊天仓库
   late final AiChatRepository _aiChatRepository;
+  // 添加HomeBloc
+  late final HomeBloc _homeBloc;
 
   @override
   void initState() {
@@ -59,6 +64,11 @@ class _MainShellPageState extends State<MainShellPage> {
     // 初始化AI聊天仓库
     _aiChatRepository = AiChatRepository();
     
+    // 初始化HomeBloc
+    _homeBloc = HomeBloc(
+      notesRepository: context.read<Repository>().notesRepository,
+    )..add(const HomeLoadNotes());
+    
     _pageContents = [
       const HomeContent(),
       const CalendarContent(),
@@ -72,6 +82,7 @@ class _MainShellPageState extends State<MainShellPage> {
     _draftController.dispose();
     _overlayEntry?.remove();
     _calendarBloc.close();
+    _homeBloc.close(); // 关闭HomeBloc
     super.dispose();
   }
 
@@ -137,8 +148,11 @@ class _MainShellPageState extends State<MainShellPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => MainShellCubit(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (context) => MainShellCubit()),
+        BlocProvider.value(value: _homeBloc),
+      ],
       child: BlocBuilder<MainShellCubit, MainShellState>(
         builder: (context, state) {
           bool hasDraft = state.draftText != null && state.draftText!.isNotEmpty;
@@ -190,14 +204,8 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) {
-        final notesRepository = context.read<NotesRepository>();
-        return HomeBloc(notesRepository: notesRepository)
-          ..add(const HomeLoadNotes());
-      },
-      child: const HomeView(),
-    );
+    // 直接使用HomeView，不再创建新的HomeBloc
+    return const HomeView();
   }
 }
 
@@ -247,15 +255,138 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.menu),
-                  tooltip: s.settingsTitle,
-                  onPressed: () => context.read<AppBarBloc>().add(AppBarMenuPressed()),
+                  icon: const Icon(Icons.sort),
+                  tooltip: s.sortOrderTitle,
+                  onPressed: () => _showSortDialog(context),
                 ),
               ],
             ),
           );
         },
       ),
+    );
+  }
+  
+  // 显示排序对话框
+  void _showSortDialog(BuildContext context) {
+    final s = AppLocalizations.of(context)!;
+    final homeBloc = context.read<HomeBloc>();
+    
+    // 获取当前排序设置
+    NoteSortType currentSortType = NoteSortType.updatedAt;
+    SortOrder currentSortOrder = SortOrder.descending;
+    
+    if (homeBloc.state is HomeLoadSuccess) {
+      final state = homeBloc.state as HomeLoadSuccess;
+      currentSortType = state.sortType;
+      currentSortOrder = state.sortOrder;
+    }
+    
+    // 显示一个简单的排序对话框，使用StatefulBuilder确保UI更新
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(s.sortOrderTitle),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    title: Text(s.sortByUpdatedTimeDesc),
+                    trailing: (currentSortType == NoteSortType.updatedAt && 
+                               currentSortOrder == SortOrder.descending) 
+                        ? const Icon(Icons.check, color: Colors.green) 
+                        : null,
+                    onTap: () {
+                      // 使用更新时间降序排序
+                      homeBloc.add(const HomeSortNotesChanged(
+                        sortType: NoteSortType.updatedAt,
+                        sortOrder: SortOrder.descending,
+                      ));
+                      
+                      // 更新本地状态以立即反映在UI上
+                      setState(() {
+                        currentSortType = NoteSortType.updatedAt;
+                        currentSortOrder = SortOrder.descending;
+                      });
+                      
+                      Navigator.pop(dialogContext);
+                    },
+                  ),
+                  ListTile(
+                    title: Text(s.sortByUpdatedTimeAsc),
+                    trailing: (currentSortType == NoteSortType.updatedAt && 
+                               currentSortOrder == SortOrder.ascending) 
+                        ? const Icon(Icons.check, color: Colors.green) 
+                        : null,
+                    onTap: () {
+                      // 使用更新时间升序排序
+                      homeBloc.add(const HomeSortNotesChanged(
+                        sortType: NoteSortType.updatedAt,
+                        sortOrder: SortOrder.ascending,
+                      ));
+                      
+                      // 更新本地状态以立即反映在UI上
+                      setState(() {
+                        currentSortType = NoteSortType.updatedAt;
+                        currentSortOrder = SortOrder.ascending;
+                      });
+                      
+                      Navigator.pop(dialogContext);
+                    },
+                  ),
+                  ListTile(
+                    title: Text(s.sortByCreatedTimeDesc),
+                    trailing: (currentSortType == NoteSortType.createdAt && 
+                               currentSortOrder == SortOrder.descending) 
+                        ? const Icon(Icons.check, color: Colors.green) 
+                        : null,
+                    onTap: () {
+                      // 使用创建时间降序排序
+                      homeBloc.add(const HomeSortNotesChanged(
+                        sortType: NoteSortType.createdAt,
+                        sortOrder: SortOrder.descending,
+                      ));
+                      
+                      // 更新本地状态以立即反映在UI上
+                      setState(() {
+                        currentSortType = NoteSortType.createdAt;
+                        currentSortOrder = SortOrder.descending;
+                      });
+                      
+                      Navigator.pop(dialogContext);
+                    },
+                  ),
+                  ListTile(
+                    title: Text(s.sortByCreatedTimeAsc),
+                    trailing: (currentSortType == NoteSortType.createdAt && 
+                               currentSortOrder == SortOrder.ascending) 
+                        ? const Icon(Icons.check, color: Colors.green) 
+                        : null,
+                    onTap: () {
+                      // 使用创建时间升序排序
+                      homeBloc.add(const HomeSortNotesChanged(
+                        sortType: NoteSortType.createdAt,
+                        sortOrder: SortOrder.ascending,
+                      ));
+                      
+                      // 更新本地状态以立即反映在UI上
+                      setState(() {
+                        currentSortType = NoteSortType.createdAt;
+                        currentSortOrder = SortOrder.ascending;
+                      });
+                      
+                      Navigator.pop(dialogContext);
+                    },
+                  ),
+                ],
+              ),
+            );
+          }
+        );
+      },
     );
   }
 }
